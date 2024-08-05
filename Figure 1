@@ -1,0 +1,46 @@
+library(Signac)
+library(Seurat)
+library(SeuratData)
+library(scater)
+library(SeuratWrappers) #1
+library(monocle3)
+library(monocle)
+library(Matrix)
+library(ggplot2)
+library(patchwork)
+library(GeneSwitches)
+library(SingleCellExperiment)
+library(dplyr)
+library(viridis)
+library(RColorBrewer)
+library(pheatmap)
+library(circlize)
+library(scCustomize)
+
+so_cvp <- CreateSeuratObject(counts = cvp, project = "CVP", min.cells = 3, min.features = 200)
+so_fop <- CreateSeuratObject(counts = fop, project = "FoP", min.cells= 3, min.features = 200)
+#combining datasets do this after regressing and normalizing
+so.combined <- merge(so_fop, y = c(so_cvp), add.cell.ids = c( "FoP", "CVP"), project = "Tastebud")
+
+table(so.combined$orig.ident)
+#CVP 6389 FoP 13931 
+
+so.combined[["percent.mt"]] <- PercentageFeatureSet(so.combined, pattern = "^mt-")
+so.combined <- ScaleData(so.combined, vars.to.regress = "percent.mt")
+VlnPlot(so.combined, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+so.combined <- NormalizeData(object = so.combined, normalization.method = "LogNormalize", scale.factor = 10000)
+so.combined<- FindVariableFeatures(so.combined)
+so.combined <- RunPCA(so.combined, pc.genes = hv.genes, pcs.compute =25 , ndims.print = 1:5, nfeatures.print = 5, genes.print = 5)
+ElbowPlot( so.combined, ndims = 50)
+so.combined <- FindNeighbors(so.combined, reduction = "pca", dims = 1:25, nn.eps = 0.5) 
+so.combined <- FindClusters(so.combined, resolution = 0.5, n.start = 10) 
+so.combined <- RunUMAP(so.combined, dims = 1:25, min.dist = 0.5)
+DimPlot(so.combined, reduction = "umap", pt.size = 0.1, label = T, ncol = 3) + ggtitle(label = "UMAP")
+
+#remove immune, endothelial clusters 
+so.combined <- subset(so.combined, idents = c("10", "12","13"), invert=T)
+
+new.cluster.ids = c("Basal progenitor", "Basal progenitor","Lingual EC", "Lgr5 stem cell", "cycling Basal","Krt14+ Basal", "cycling Basal", "Ductal (von Ebner)", "Intermediate progenitor", "Taste (Type-I & III)", "Taste (Type-II)", "Acinar (von Ebner)")
+names(x = new.cluster.ids) <- levels(x = so.combined)
+anno.cvpfop1 <- RenameIdents(object = so.combined, new.cluster.ids)
