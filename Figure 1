@@ -41,6 +41,55 @@ DimPlot(so.combined, reduction = "umap", pt.size = 0.1, label = T, ncol = 3) + g
 #remove immune, endothelial clusters 
 so.combined <- subset(so.combined, idents = c("10", "12","13"), invert=T)
 
-new.cluster.ids = c("Basal progenitor", "Basal progenitor","Lingual EC", "Lgr5 stem cell", "cycling Basal","Krt14+ Basal", "cycling Basal", "Ductal (von Ebner)", "Intermediate progenitor", "Taste (Type-I & III)", "Taste (Type-II)", "Acinar (von Ebner)")
+new.cluster.ids = c("Basal progenitor", "Basal progenitor","Lingual EC", "Lgr5+ stem cell", "cycling Basal","Krt14+ Basal", "cycling Basal", "Ductal (saliva)", "Intermediate progenitor", "Taste (Type-I & III)", "Taste (Type-II)", "Acinar (saliva)")
 names(x = new.cluster.ids) <- levels(x = so.combined)
 anno.cvpfop1 <- RenameIdents(object = so.combined, new.cluster.ids)
+
+#genes utilized for clustering 
+cluster_fig1<-c("Snap25","Car4","Entpd2", "Krt8", "Krt19", "Gnat3","Trpm5" , "Krt5", "Krt14", "Mki67", "Bmi1", "Krt4", "Krt13", "Vim", "Lgr5", "Lgr6", "Acta2", "Muc19","Dcpp1", "Cldn2", "Sox9", "Sox2")
+
+clust.cols <- ggplotColours(n=10)
+
+p <- DotPlot_scCustom(annocvpfop , features = cluster_fig1)
+data <- p$data
+ggplot2::ggplot(data, ggplot2::aes(y = id, x = features.plot, size = pct.exp, fill = avg.exp.scaled)) +
+  ggplot2::geom_point(shape=21)+
+  ggplot2::theme_bw() +
+  ggplot2::scale_size_area(max_size = 10) +
+  ggplot2::scale_fill_gradient2(low="blue3",high="red3",mid="white",limits=c(-2.5,2.5)) +
+  ggplot2::labs(fill="Relative expression", size = "Percent expressed") +
+  ggplot2::xlab("Cluster") +
+  ggplot2::ylab("Gene") +
+  ggplot2::theme(axis.text.y = ggplot2::element_text(size=12,color=clust.cols),
+                 axis.text.x = ggplot2::element_text(size=12,angle = 45, hjust=1),
+                 axis.title = ggplot2::element_text(size=0),
+                 legend.title=ggplot2::element_text(size=14),
+                 legend.text = ggplot2::element_text(size=12),
+                 legend.position = "bottom",
+                 panel.background = ggplot2::element_rect(colour = "black", size=1)+
+  ggplot2::guides(size=ggplot2::guide_legend(ncol=2, title.position = "top"),
+                  fill=ggplot2::guide_colorbar(title.position = "top", label.position = "top")))
+
+#### figure S2
+vonebneranno.markers <- c("Dcpp1", "Dcpp3","Aqp5", "Bhlha15", "Krt19","Krt8", "Krt7", "Cldn10","Cldn2","Ltf", "Dmbt1","Acta2","Myl9", "Muc19",  "Muc16", "Muc5b", "Amy1", "Mki67", "Krt14", "Krt5", "Kit", "Psca", "Sox9","Epcam")
+
+p <- DotPlot_scCustom(vonEbner , features = vonebneranno.markers)
+
+data <- p$data
+ggplot2::ggplot(data, ggplot2::aes(y = id, x = features.plot, size = pct.exp, fill = avg.exp.scaled)) +
+  ggplot2::geom_point(shape=21)+
+  ggplot2::theme_bw() +
+  ggplot2::scale_size_area(max_size = 10) +
+  ggplot2::scale_fill_gradient2(low="blue3",high="red3",mid="white",limits=c(-2.5,2.5)) +
+  ggplot2::labs(fill="Relative expression", size = "Percent expressed") +
+  ggplot2::xlab("Cluster") +
+  ggplot2::ylab("Gene") +
+  ggplot2::theme(axis.text.y = ggplot2::element_text(size=12,color=clust.cols),
+                 axis.text.x = ggplot2::element_text(size=12,angle = 45, hjust=1),
+                 axis.title = ggplot2::element_text(size=0),
+                 legend.title=ggplot2::element_text(size=14),
+                 legend.text = ggplot2::element_text(size=12),
+                 legend.position = "bottom",
+                 panel.background = ggplot2::element_rect(colour = "black", size=1)+
+                   ggplot2::guides(size=ggplot2::guide_legend(ncol=2, title.position = "top"),
+                                   fill=ggplot2::guide_colorbar(title.position = "top", label.position = "top")))
