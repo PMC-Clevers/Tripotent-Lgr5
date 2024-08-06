@@ -1,0 +1,292 @@
+library(EnhancedVolcano)
+library(ggplot2)
+library(scales) # needed for oob parameter
+library(viridis)
+library(reshape2)
+library(fgsea)
+library(DESeq2)
+library(dplyr)
+
+
+data <- read.table("readcounts_raw.csv",stringsAsFactors = FALSE, fill = TRUE)
+sampleinfo <- read.table("Foxe1_coldata.txt")
+
+dds <- DESeqDataSetFromMatrix(datafil, sampleinfo, ~Condition)
+dds <- DESeqDataSetFromMatrix(datafil, sampleinfo, ~Condition)
+ddsDE <-DESeq(dds)
+
+datafil <- data[which(rowSums(data) > 50),]
+resFoxe1 <- results(ddsDE, alpha = 0.05)
+sigGenes <- subset(resFoxe1, abs(log2FoldChange) >= 1 & resFoxe1$padj<0.01 )
+
+EnhancedVolcano(resFoxe1,
+                lab = rownames(resFoxe1),
+                x = 'log2FoldChange',
+                y = 'pvalue')
+
+library("pheatmap")
+
+select <- order(rowMeans(counts(ddsDE,normalized=TRUE)),
+                decreasing=TRUE)[1:22]
+df <- as.data.frame(colData(dds)[,c("Condition","Origin")])
+pheatmap(assay(ntd)[select,], cluster_rows=FALSE, show_rownames=FALSE,
+         cluste r_cols=FALSE, annotation_col=df)
+
+vsd <-vst(ddsDE, blind=FALSE)
+sampleDists <- dist(t(assay(vsd)))
+library("RColorBrewer")
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- paste(vsd$Condition, vsd$Origin, sep="-")
+colnames(sampleDistMatrix) <- NULL
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+
+Tas1r3 <- plotCounts(ddsDE, gene="Tas1r3", intgroup="Condition", 
+                     returnData=TRUE)
+Dmbt1 <-  plotCounts(ddsDE, gene="Dmbt1", intgroup="Condition", 
+                     returnData=TRUE)
+Entpd2 <-  plotCounts(ddsDE, gene="Entpd2", intgroup="Condition", 
+                     returnData=TRUE)
+  
+ggplot(Entpd2, aes(x = Condition, y = count, color = Condition))+ 
+  geom_point(position=position_jitter(w = 0.1,h = 0)) +
+  geom_text_repel(aes(label = rownames(Entpd2))) +
+  theme_bw() +
+  ggtitle("Entpd2") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+Tas1r3 <- plotCounts(ddsDE, gene="Tas1r3", intgroup="Condition", 
+                   returnData=TRUE)
+Gna14 <- plotCounts(ddsDE, gene="Gna14", intgroup="Condition", 
+                     returnData=TRUE)
+
+Otop1 <- plotCounts(ddsDE, gene="Otop1", intgroup="Condition", 
+                    returnData=TRUE)
+Scnn1a <- plotCounts(ddsDE, gene="Scnn1a", intgroup="Condition", 
+                    returnData=TRUE)
+
+ggplot(Scnn1a, aes(x = Condition, y = count, color = Condition))+ 
+  geom_point(position=position_jitter(w = 0.1,h = 0)) +
+  geom_text_repel(aes(label = rownames(Scnn1a))) +
+  theme_bw() +
+  ggtitle("Scnn1a") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+ggplot(Otop1, aes(x = Condition, y = count, color = Condition))+ 
+  geom_point(position=position_jitter(w = 0.1,h = 0)) +
+  geom_text_repel(aes(label = rownames(Otop1))) +
+  theme_bw() +
+  ggtitle("Otop1") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+Krt8 <- plotCounts(ddsDE, gene="Krt8", intgroup="Condition", 
+                  returnData=TRUE)
+
+ggplot(Krt8, aes(x = Condition, y = count, color = Condition))+ 
+  geom_point(position=position_jitter(w = 0.1,h = 0)) +
+  geom_text_repel(aes(label = rownames(Krt8))) +
+  theme_bw() +
+  ggtitle("Krt8") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+ntd <- normTransform(ddsDE)
+rld <- rlog(dds)
+normalised_counts <- assay(ntd)
+vsd <- vst(ddsDE, blind=FALSE)
+rownames(sigGenes[interesting_rows,])
+
+interesting_rows <- unlist(list(order(sigGenes$log2FoldChange, decreasing =TRUE)[1:50],
+                               rev(order(sigGenes$log2FoldChange, decreasing =FALSE)[1:30])))
+
+interesting_rows_up <- unlist(list(order(sigGenes$log2FoldChange, decreasing =TRUE)[1:200]))
+interesting_rows_down <- unlist(list(rev(order(sigGenes$log2FoldChange, decreasing =FALSE)[1:100])))
+
+
+genesdown <- rownames(sigGenes[interesting_rows_up,])
+pheatmap(assay(ntd)[rownames(sigGenes[interesting_rows,]),],
+         cluster_rows = T,
+         show_rownames = T,
+         cluster_cols = F,
+         color = colorRampPalette(rev(brewer.pal(8, name = "PuOr")))(255),
+         border_color = "white",
+         scale = "row",
+         main = "WT vs Foxe1 K/O")
+genesdown <-  rownames(sigGenes[interesting_rows,])
+genesup <-  rownames(sigGenes[interesting_rows_down,])
+#PCA_plotje, ook goed om te hebben
+plotPCA(vsd, intgroup = c("Condition"), ntop = 5000) + theme_bw() +
+  scale_color_manual(values = c("blue", "red", "green", "gray", "black", "yellow", "orange", "purple", "pink")) + theme_classic() +
+  ggtitle("PCA plot WT vs Foxe1-/-")
+
+#PCA_plotje, ook goed om te hebben
+plotPCA(vsd, intgroup = c("Condition"), ntop = 5000) + theme_bw() +
+  scale_color_manual(values = c("blue", "red", "green", "gray", "black", "yellow", "orange", "purple", "pink")) + theme_classic() +
+  ggtitle("PCA plot WT vs Foxe1-/-") +geom_label_repel(aes(label = row.names(sampleinfo)))
+
+rowSums(assay(dds)[c("Otop1","Tas1r3","Krt20","Krt19","Krt7", "Cldn3", "Muc5b", "Muc16", "Bpif1a",
+                     "Lgr5", "Il33", "Elf3"),])
+
+EnhancedVolcano(resFoxe1,
+                lab = rownames(resFoxe1),
+                x = 'log2FoldChange',
+                y = 'padj',
+                selectLab = c('Otop1','Tas1r3','Krt20',
+                              'Krt19','Krt7','Cldn3','Muc5b','Muc16','Bpif1a', 'Lgr5', 'Il33', 'Elf3'),
+                xlab = bquote(~Log[2]~ 'fold change'),
+                pCutoff = 0.05,
+                FCcutoff = 0.75,
+                pointSize = 4.0,
+                labSize = 6.0,
+                labCol = 'black',
+                labFace = 'bold',
+                boxedLabels = TRUE,
+                colAlpha = 4/5,
+                legendPosition = 'right',
+                legendLabSize = 14,
+                legendIconSize = 4.0,
+                drawConnectors = TRUE,
+                widthConnectors = 1.0,
+                colConnectors = 'black')
+
+cvpfop@meta.data <- cvpfop@meta.data[,-grep("knockout_", colnames(cvpfop@meta.data))]
+taste@meta.data <- taste@meta.data[,-grep("knockout_", colnames(taste@meta.data))]
+vonEbner@meta.data <- vonEbner@meta.data[,-grep("knockout_", colnames(vonEbner@meta.data))]
+
+cvpfop@meta.data <- cvpfop@meta.data[,-grep("Foxe1_", colnames(cvpfop@meta.data))]
+vonEbner@meta.data <- vonEbner@meta.data[,-grep("Foxe1_", colnames(vonEbner@meta.data))]
+taste@meta.data <- taste@meta.data[,-grep("Foxe1_", colnames(taste@meta.data))]
+vonEbner@meta.data <- vonEbner@meta.data[,-grep("Foxe1_", colnames(vonEbner@meta.data))]
+
+vonEbner@meta.data
+taste <- AddModuleScore(taste, 
+                         features = list(genesdown), ctrl =100, 
+                         name = "knockout_score" )
+taste <- AddModuleScore(taste, 
+                        features = list(genesup), ctrl =100, 
+                        name = "Foxe1_score" )
+cvpfop <- AddModuleScore(cvpfop, 
+                         features = list(genesup), ctrl =100, 
+                         name = "Foxe1_score" )
+
+vonEbner <- AddModuleScore(vonEbner, 
+                         features = list(genesdown), ctrl =100, 
+                         name = "knockout_score" )
+
+vonEbner <- AddModuleScore(vonEbner, 
+                           features = list(genesup), ctrl =100, 
+                           name = "Foxe1_score" )
+VlnPlot(cvpfop, features = "Foxe1_score1", pt.size = 0) + NoLegend()
+
+FeaturePlot(taste, features =  "knockout_score1", reduction = "umap", pt.size = 1) +
+  scale_color_gradientn(colors = colorRampPalette(rev(brewer.pal(11, "Spectral")))(50))
+FeaturePlot(vonEbner, features =  "knockout_score1", reduction = "umap", pt.size = 1) +
+  scale_color_gradientn(colors = colorRampPalette(rev(brewer.pal(11, "Spectral")))(50))
+FeaturePlot(taste, features =  "Foxe1_score1", reduction = "umap", pt.size = 0.1) +
+  scale_color_gradientn(colors = colorRampPalette(rev(brewer.pal(11, "Spectral")))(50))
+
+FeaturePlot(vonEbner, features =  "Foxe1_score1", reduction = "umap", pt.size = 0.1) +
+  scale_color_gradientn(colors = colorRampPalette(rev(brewer.pal(11, "Spectral")))(50))
+
+FeaturePlot(cvpfop, features = c("Sox8", "Foxf2", "Cldn2", "Vcam1", "Lyz2"))
+write.csv(genesdown, "20240123_genelist_foxe1KOhigh.csv")
+
+interesting_genes <- c("Lyz2", "Tff2","Dmbt1", "Muc16", "Muc5b", "Muc5ac", "Aqp5", "Bpifa1","Krt14","Krt13", "Sprr1b", "Krt19","Krt20", "Cldn6","Gna14", "Tas1r3", "Otop1", "Lgr5", "Lgr6", "Sox9")
+feature
+anno <- as.data.frame(colData(ntd)[c("Condition")])
+write.csv(res_significant, "20240124_ressignificantFoxe1.csv")
+
+res_significant <- resFoxe1[which(resFoxe1$pvalue < 0.01),]
+sigGenes <- as.data.frame(sigGenes)
+pheatmap(assay(ntd)[rownames(sig_foxe1_cvp[interesting_genes,]),],
+         cluster_rows = T,
+         show_rownames = T,
+         cluster_cols = F,
+         color = colorRampPalette(rev(brewer.pal(8, name = "PuOr")))(255),
+         border_color = "white",
+         scale = "row",
+         main = "WT vs Foxe1 K/O")
+
+pheatmap(assay(ntd)[rownames(res_significant[interesting_genes,]),],
+         show_rownames = T,
+         color = colorRampPalette(rev(brewer.pal(8, name = "PuOr")))(255),
+         border_color = "white",
+         scale = "row",
+         main = "WT vs Foxe1 K/O")
+#check CVP only + check FoP only
+
+ddsorigin <- DESeqDataSetFromMatrix(datafil, sampleinfo, ~Origin)
+
+vst.subC <- vsd[ , vsd$Condition %in% "Organoid" ]
+ddsDE_sub <- DESeq(ddsorigin)
+
+
+resorigin <- results(ddsDE_sub, alpha = 0.05)
+EnhancedVolcano(resorigin,
+                lab = rownames(resorigin),
+                x = 'log2FoldChange',
+                y = 'pvalue')
+
+cvpsampleinfo <- read.table("CVPFoxe1_coldata.txt")
+fopsampleinfo<- read.table("FoPFoxe1_coldata.txt")
+cvpdata <- data %>% select(1:6)
+fopdata <- data %>% select(7:12)
+cvpdata <- read.csv("20240124_cvpdata.csv", row.names = 'X')
+fopdata <- read.csv("20240124_fopdata.csv",  row.names = 'X')
+cvpdds <- DESeqDataSetFromMatrix(cvpdata, cvpsampleinfo, ~Condition)
+ddsDEcvp <-DESeq(cvpdds)
+ntd <- normTransform(ddsDEcvp)
+rld <- rlog(ddsDEcvp)
+normalised_counts <- assay(ntd)
+vsd <- vst(ddsDEcvp, blind=FALSE)
+
+
+fopdds <- DESeqDataSetFromMatrix(fopdata, fopsampleinfo, ~Condition)
+ddsDEfop <-DESeq(fopdds)
+ntdcvp <- normTransform(ddsDEcvp)
+ntdfop <- normTransform(ddsDEfop)
+rld <- rlog(ddsDEfop)
+normalised_counts <- assay(ntd)
+vsd <- vst(ddsDEfop, blind=FALSE)
+
+
+rescvp <- results(ddsDEcvp, alpha = 0.05)
+resfop <- results(ddsDEfop, alpha = 0.05)
+
+sigGenescvp <- subset(rescvp, abs(log2FoldChange) >= 0.5 & (rescvp$baseMean > 30) & rescvp$padj<0.05 )
+sigGenesfop <- subset(resfop, abs(log2FoldChange) >= 0.25 & (resfop$baseMean > 30) & resfop$padj<0.05 )
+
+interesting_rows <- unlist(list(order(sigGenesfop$log2FoldChange, decreasing =TRUE)[1:50],
+                                rev(order(sigGenesfop$log2FoldChange, decreasing =FALSE)[1:30])))
+
+pheatmap(assay(ntdcvp)[rownames(sig_foxe1_cvp[interesting_genes,]),],
+         cluster_rows = T,
+         show_rownames = T,
+         cluster_cols = F,
+         color = colorRampPalette(rev(brewer.pal(8, name = "PuOr")))(255),
+         border_color = "white",
+         scale = "row",
+         main = "WT vs Foxe1 K/O")
+pheatmap(assay(ntdfop)[rownames(resfop[interesting_genes,]),],
+         cluster_rows = T,
+         show_rownames = T,
+         cluster_cols = F,
+         color = colorRampPalette(rev(brewer.pal(8, name = "PuOr")))(255),
+         border_color = "white",
+         scale = "row",
+         main = "WT vs Foxe1 K/O")
+
+write.csv(cvpdata, "20240124_cvpdata.csv")
+write.csv(fopdata, "20240124_fopdata.csv")
+
+write.csv(fopdata, "20240124_fopdata.csv")
+
+
+sig_foxe1_cvp <- read.csv("20240124_siggenes_cvp.csv", row.names = 'X')
+sig_foxe1_fop <- read.csv("20240124_siggenes_fop.csv", row.names = 'X')
