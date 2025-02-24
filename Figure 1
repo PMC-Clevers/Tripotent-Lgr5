@@ -41,13 +41,17 @@ DimPlot(so.combined, reduction = "umap", pt.size = 0.1, label = T, ncol = 3) + g
 #remove immune, endothelial clusters 
 so.combined <- subset(so.combined, idents = c("10", "12","13"), invert=T)
 
-new.cluster.ids = c("Basal progenitor", "Basal progenitor","Lingual EC", "Lgr5+ stem cell", "cycling Basal","Krt14+ Basal", "cycling Basal", "Ductal (saliva)", "Intermediate progenitor", "Taste (Type-I & III)", "Taste (Type-II)", "Acinar (saliva)")
+new.cluster.ids = c("Basal progenitor", "Basal progenitor","Lingual EC", "Lgr5+ stem cell", "cycling Basal","Krt14+ Basal", "cycling Basal", "Ductal (saliva)", "Intermediate progenitor", "Taste (Type-I, III & IV)", "Taste (Type-II)", "Acinar (saliva)")
 names(x = new.cluster.ids) <- levels(x = so.combined)
 anno.cvpfop1 <- RenameIdents(object = so.combined, new.cluster.ids)
 
 #genes utilized for clustering 
-cluster_fig1<-c("Snap25","Car4","Entpd2", "Krt8", "Krt19", "Gnat3","Trpm5" , "Krt5", "Krt14", "Mki67", "Bmi1", "Krt4", "Krt13", "Vim", "Lgr5", "Lgr6", "Acta2", "Muc19","Dcpp1", "Cldn2", "Sox9", "Sox2")
-
+cluster_fig1<-c("Snap25","Car4","Entpd2", "Krt8", "Krt19", "Gnat3","Trpm5" , "Krt5", "Krt14", "Mki67", "Sprr1b", "Krt4", "Krt13", "Vim", "Shh","Lgr5", "Lgr6", "Acta2", "Muc19","Dcpp1", "Cldn2", "Sox9", "Sox2")
+##function to get colours from umap based on amount of clusters
+ggplotColours <- function(n = 6, h = c(0, 360) + 15){
+  if ((diff(h) %% 360) < 1) h[2] <- h[2] - 360/n
+  hcl(h = (seq(h[1], h[2], length = n)), c = 100, l = 65)
+}
 clust.cols <- ggplotColours(n=10)
 
 p <- DotPlot_scCustom(annocvpfop , features = cluster_fig1)
