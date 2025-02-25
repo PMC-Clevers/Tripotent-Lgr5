@@ -1,0 +1,281 @@
+
+#### Lgr5 clonal lines 
+#### 18062024
+
+library(Signac)
+library(Seurat)
+library(SeuratData)
+library(scater)
+library(SeuratWrappers) #1
+library(monocle3)
+library(monocle)
+library(Matrix)
+library(ggplot2)
+library(patchwork)
+library(GeneSwitches)
+library(SingleCellExperiment)
+library(dplyr)
+library(viridis)
+library(ggrepel)
+library(RColorBrewer)
+library(slingshot)
+library(tradeSeq)
+library(pheatmap)
+library(circlize)
+library(scCustomize)
+
+
+c1 <-Read10X("LX594_an855_filtered_feature_bc_matrix/")
+c3 <-Read10X("LX595_an856_filtered_feature_bc_matrix/")
+c7 <-Read10X("LX596_an857_filtered_feature_bc_matrix/")
+
+so_c1 <- CreateSeuratObject(counts = c1, project = "Clone1", min.cells = 3, min.features = 200)
+so_c3 <- CreateSeuratObject(counts = c3, project = "Clone3", min.cells = 3, min.features = 200)
+so_c7 <- CreateSeuratObject(counts = c7, project = "Clone7", min.cells = 3, min.features = 200)
+
+so.combined <- merge(so_c1, y = c(so_c3, so_c7), add.cell.ids = c("Clone1", "Clone3", "Clon7"), project = "Tastebud")
+table()
+
+table(so_c1$orig.ident)
+table(so_c3$orig.ident)
+table(so_c7$orig.ident)
+so.combined[["percent.mt"]] <- PercentageFeatureSet(so.combined, pattern = "^mt-")
+VlnPlot(so.combined, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+### removed cluster 5 as it has too much mt2 genes and low nFeatures
+so.combined <- subset(so.combined, , idents = c("5"), invert = T)
+
+so.combined <- subset(so.combined, , idents = c("6"), invert = T)
+so.combined <- NormalizeData(object = so.combined, normalization.method = "LogNormalize", scale.factor = 10000)
+so.combined <- subset(so.combined, subset = nFeature_RNA > 200 & nFeature_RNA < 7500 & percent.mt < 30)
+
+so.combined <- ScaleData(so.combined, features = row.names(so.combined))
+so.combined<- FindVariableFeatures(so.combined)
+so.combined <- RunPCA(so.combined, pc.genes = hv.genes, pcs.compute =20 , ndims.print = 1:5, nfeatures.print = 5, genes.print = 5)
+ElbowPlot( so.combined, ndims = 50)
+so.combined <- FindNeighbors(so.combined, reduction = "pca", dims = 1:20, nn.eps = 0.5) 
+so.combined <- FindClusters(so.combined, resolution = 0.5 ) 
+so.combined <- RunUMAP(so.combined, dims = 1:18, min.dist = 0.5, reduction.name = "umap.unintegrated")
+primorg.combined <- IntegrateLayers(object = primorg.combined, method = RPCAIntegration, orig.reduction = "pca", new.reduction = "integrated.rpca",
+                                    verbose = FALSE,normalization.method = "SCT")
+##RPCA
+so.combined <- SCTransform(so.combined)
+so.combined <- RunPCA(so.combined)
+so.combined <- IntegrateLayers(object = so.combined, method = RPCAIntegration, orig.reduction = "pca", new.reduction = "integrated.rpca",
+                                    verbose = FALSE,normalization.method = "SCT")
+primorg.combined <- RunPCA(primorg.combined,dims = 1:12 )
+ElbowPlot(primorg.combined)
+so.combined <- FindNeighbors(so.combined, reduction = "integrated.rpca", dims = 1:15)
+so.combined <- FindClusters(so.combined, resolution = 0.5, cluster.name = "rpca_clusters")
+so.combined <- RunUMAP(so.combined, reduction = "integrated.rpca", dims = 1:15, min.dist = 0.1, reduction.name = "umap.rpca")
+DimPlot(so.combined,
+        reduction = "umap.rpca",
+        split.by = "orig.ident",
+        label = T,
+        combine = FALSE, label.size = 3
+)
+FeaturePlot(so.combined, features = c("Kcnq1", "Hes6", "Sox2"),reduction = "umap.rpca")
+FeaturePlot(so.combined, features = c("Kcnq1", "Hes6", "Sox2"),reduction = "umap.rpca")
+
+DimPlot(so.combined, reduction = "umap.cca", pt.size = 0.1, label = T, ncol = 3) + ggtitle(label = "UMAP")
+so.combined@meta.data$orig.ident
+
+so.combined[["RNA"]] <- JoinLayers(so.combined[["RNA"]])
+so.combined <- PrepSCTFindMarkers(so.combined, assay = "SCT", verbose = TRUE)
+
+Markers2 <- FindAllMarkers(so.combined, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+DotPlot(primorg.combined, features = c("Pou2f3","Ascl2","Entpd2", "Krt8", "Krt19", "Krt7", "Aqp5" , "Krt5", "Krt14", "Mki67", "Krt4", "Krt13", "Sprr1b", "Lgr5", "Lgr6", "Acta2", "Muc19","Dcpp1", "Cldn2", "Sox9", "Sox2")) 
+saveRDS(so.combined, "20240618_lgr5_clonesc_137.rds")
+so.combined <- readRDS("20240620_ccaIntegrate_clonal_tissue.rds")
+
+library(data.table)
+library(magrittr)
+cells.cluster <- primorg.combined@meta.data %>% as.data.table
+cells.cluster[, .N, by =c("seurat_clusters", "orig.ident")]
+
+
+#MT  check
+so.combined_mt <- NormalizeData(object = so.combined_mt, normalization.method = "LogNormalize", scale.factor = 10000)
+so.combined_mt <- subset(so.combined_mt, subset = nFeature_RNA > 200 & nFeature_RNA < 8000 & percent.mt > 31)
+so.combined_mt <- ScaleData(so.combined_mt, features = row.names(so.combined_mt))
+
+so.combined_mt <- ScaleData(so.combined_mt, vars.to.regress = "percent.mt")
+
+so.combined_mt<- FindVariableFeatures(so.combined_mt)
+so.combined_mt <- RunPCA(so.combined_mt, pc.genes = hv.genes, pcs.compute =15 , ndims.print = 1:5, nfeatures.print = 5, genes.print = 5)
+ElbowPlot( so.combined_mt, ndims = 50)
+so.combined_mt <- FindNeighbors(so.combined_mt, reduction = "pca", dims = 1:15, nn.eps = 0.5) 
+so.combined_mt <- FindClusters(so.combined_mt, resolution = 0.5, n.start = 10) 
+so.combined_mt <- RunUMAP(so.combined_mt, dims = 1:25, min.dist = 0.5)
+DimPlot(so.combined_mt, reduction = "umap", pt.size = 0.1, label = T, ncol = 3) + ggtitle(label = "UMAP")
+
+annocvpfop <- readRDS("TX/20230810_annocvpfop.rds")
+
+# split datasets and process without integration
+so.combined[["RNA"]] <- split(so.combined[["RNA"]], f = so.combined$orig.ident)
+primorg.combined[["RNA"]] <- split(primorg.combined[["RNA"]], f = primorg.combined$orig.ident)
+
+primorg.combined <- merge(so.combined, annocvpfop)
+rm(annocvpfop)
+rm(so.combined)
+primorg.combined <- SCTransform(primorg.combined)
+primorg.combined <- RunPCA(primorg.combined)
+
+primorg.combined[["RNA"]] <- JoinLayers(primorg.combined[["RNA"]])
+Layers(primorg.combined[["RNA"]])
+DimPlot(primorg.combined)
+
+##CCA 
+primorg.combined <- IntegrateLayers(object = primorg.combined, method = CCAIntegration, orig.reduction = "pca", new.reduction = "integrated.cca",
+                                 verbose = FALSE,normalization.method = "SCT")
+primorg.combined <- ScaleData(primorg.combined, features = row.names(primorg.combined))
+primorg.combined<- VariableFeatures(primorg.combined)
+primorg.combined <- RunPCA(primorg.combined,dims = 1:10 )
+ElbowPlot(primorg.combined)
+primorg.combined <- FindNeighbors(primorg.combined, reduction = "integrated.cca", dims = 1:10)
+primorg.combined <- FindClusters(primorg.combined, resolution = 0.5)
+primorg.combined <- RunUMAP(primorg.combined, reduction = "integrated.cca", dims = 1:10, reduction.name = "umap.cca")
+DimPlot(primorg.combined,
+        label=T, 
+        split.by = 'orig.ident', label.size = 4, label.box = T
+) + NoLegend()
+##rpca RPCAIntegration
+primorg.combined <- IntegrateLayers(object = primorg.combined, method = RPCAIntegration, orig.reduction = "pca", new.reduction = "integrated.rpca",
+                                    verbose = FALSE,normalization.method = "SCT")
+
+primorg.combined <- NormalizeData(object = primorg.combined, normalization.method = "LogNormalize", scale.factor = 10000)
+primorg.combined <- ScaleData(primorg.combined, features = row.names(primorg.combined))
+primorg.combined <- RunPCA(primorg.combined,dims = 1:12 )
+ElbowPlot(primorg.combined)
+primorg.combined <- FindNeighbors(primorg.combined, reduction = "integrated.rpca", dims = 1:12)
+primorg.combined <- FindClusters(primorg.combined, resolution = 0., cluster.name = "rpca_clusters")
+primorg.combined <- RunUMAP(primorg.combined, reduction = "integrated.rpca", dims = 1:12, reduction.name = "umap.rpca")
+DimPlot(primorg.combined,
+        reduction = "umap.cca",
+      split.by = "orig.ident",
+        combine = FALSE
+)
+FeaturePlot(so.combined, features = c("Smo", "Ptch1", "Shh"),reduction = "umap.cca")
+
+
+DimPlot_scCustom(seurat_object = primorg.combined, reduction = "umap.cca",
+                 split.by = "orig.ident",
+                 combine = FALSE,figure_plot = TRUE)
+hcvp.combined <- ScaleData()
+primorg.combined <- PrepSCTFindMarkers(primorg.combined, assay = "SCT", verbose = TRUE)
+markers_combined<- FindAllMarkers(primorg.combined, only.pos = TRUE, min.pct = 0.20, logfc.threshold = 0.5)
+
+
+salivabased= c("Dcpp1", "Dcpp3","Aqp5", "Bhlha15", "Krt19","Krt8", "Krt7", "Cldn10","Cldn2","Ltf", "Dmbt1","Acta2","Myl9", "Muc19",  "Muc16", "Muc5b", "Amy1", "Mki67", "Krt14", "Krt5", "Kit", "Psca", "Sox9","Epcam")
+DotPlot(primorg.combined, features = salivabased, split.by = 'orig.ident', cols =c("blue", "white", "yellow", "red", "purple"))   
+DotPlot(primorg.combined, features = c("Sprr1b", "Krt4", "Krt13"), split.by = 'orig.ident', cols =c("blue", "white", "yellow", "red", "purple"))   
+FeaturePlot(primorg.combined, features = c("Sprr1b", "Krt4", "Krt13"), split.by = 'orig.ident')
+## markers saliva: Sox9, Cldn10, Ltf, aqp5, Krt7, Krt19, Acta2, Mucc16, Kit
+## markers LEC: Sprr1b, Krt4, Krt13
+## markers taste: Sox2, Gna14, Entpd2, Kcnq1, Hes6
+##0-1: lgr5/lgr6/lgr4
+## 2: LEC
+## 3: Acta2/cd34
+## 4&6= sox2 Sox9
+## 5= taste & von ebner
+## 7&9 cycling 
+new.cluster.ids = c("Lgr4/5/6-precursor", "Lgr4/5/6-precursor","non-taste Lingual EC", "Intermediate#1", "Intermediate#2", "Taste and Saliva","Intermediate#2", "cycling Basal", "Lgr4/5/6-precursor", "cycling Basal")
+names(x = new.cluster.ids) <- levels(x = so.combined)
+so.combined <- RenameIdents(object = so.combined, new.cluster.ids)
+
+new.cluster.ids = c("Lgr5/6-precursor","non-taste Lingual EC", "Intermediate#1", "Intermediate#2", "Taste and Saliva", "cycling Basal")
+names(x = new.cluster.ids) <- levels(x = so.combined)
+so.combined <- RenameIdents(object = so.combined, new.cluster.ids)
+
+
+primorg.combined <- readRDS( "20240620_ccaIntegrate_clonal_tissue.rds")
+
+annomarkers= c("Foxa1","Kcnq1","Gna14","Entpd2","Hes6", "Krt8", "Krt19", "Krt7", "Ltf", "Cldn10" ,"Aqp5", "Muc16", "Kit", "Krt5", "Krt14", "Trp63", "Mki67", "Krt4", "Krt13", "Sprr1b", "Lgr5","Lgr6", "Acta2", "Cd34","Sox9", "Sox2")
+p <- DotPlot_scCustom(so.combined , features = annomarkers)
+p <- DotPlot_scCustom(primorg.combined , features = clusterbased)
+
+ggplotColours <- function(n = 6, h = c(0, 360) + 15){
+  if ((diff(h) %% 360) < 1) h[2] <- h[2] - 360/n
+  hcl(h = (seq(h[1], h[2], length = n)), c = 100, l = 65)
+}
+clust.cols <- ggplotColours(n=12)
+data <- p$data
+ggplot2::ggplot(data, ggplot2::aes(y = id, x = features.plot, size = pct.exp, fill = avg.exp.scaled)) +
+  ggplot2::geom_point(shape=21)+
+  ggplot2::theme_bw() +
+  ggplot2::scale_size_area(max_size = 10) +
+  ggplot2::scale_fill_gradient2(low="blue3",high="red3",mid="white",limits=c(-2.5,2.5)) +
+  ggplot2::labs(fill="Relative expression", size = "Percent expressed") +
+  ggplot2::xlab("Cluster") +
+  ggplot2::ylab("Gene") +
+  ggplot2::theme(axis.text.y = ggplot2::element_text(size=12,color=clust.cols),
+                 axis.text.x = ggplot2::element_text(size=12,angle = 45, hjust=1),
+                 axis.title = ggplot2::element_text(size=0),
+                 legend.title=ggplot2::element_text(size=14),
+                 legend.text = ggplot2::element_text(size=12),
+                 legend.position = "bottom",
+                 panel.background = ggplot2::element_rect(colour = "black", size=1)+
+                   ggplot2::guides(size=ggplot2::guide_legend(ncol=2, title.position = "top"),
+                                   fill=ggplot2::guide_colorbar(title.position = "top", label.position = "top")))
+
+table(so.combined$orig.ident)
+#### clone1 2642, clone3 3248, clone7 4144 
+
+##annotation umap ccintegrated  clonal organoids primary tissue
+## 0,1, 3,6, basal
+## 2: LEC
+## 5, 10: cycling basal #1 
+## 4: cycling basal #2 
+## 11: Sox9 progenitor 
+## 8: salivary gland
+## 12 taste buds 
+## 7: lgr5 stem cell 
+## 9: 
+
+#### figure 4f 
+primorg.combined$cell_types <- primorg.combined@active.ident
+
+# Set newly annotated cell types
+so.combined$cell_types[colnames(so.combined)] <- so.combined$cell_types
+DimPlot(primorg.combined, reduction = "umap.cca", group.by = "cell_types")
+
+# Create UMAP projection plots per condition
+plotx <- DimPlot(primorg.combined, reduction = "umap.cca", group.by = "cell_types", label = T, label.box=TRUE, label.size = 8, raster = T) +
+  scale_color_manual(values = clust.cols) +
+  theme_void() + NoLegend() +
+  scale_shape_manual(values = c(21))
+ plotx[[1]]$data
+ plot(plotx) 
+
+
+plotx[[1]]$data
+
+
+plot(plotx)
+
+#### figure 4 g
+
+# Calculate proportions
+cell_counts <- cell_counts %>%
+  group_by(Sample) %>%
+  mutate(Proportion = Count / sum(Count))  # Normalize counts to proportions
+
+# View the processed data
+head(cell_counts)
+
+
+ggplot(cell_counts, aes(x = Sample, y = Proportion, fill = Cell_Type)) +
+    geom_bar(stat = "identity", position = "fill") +  
+    scale_fill_manual(values = clust.cols) +  # Use predefined colors
+    theme_minimal(base_size = 18) +  # Increases overall text size
+    labs(title = "Cell Type Proportions Per Sample",
+         x = "Sample",
+         y = "Proportion") +
+    theme(
+        axis.text.x = element_text(size = 18, angle = 45, hjust = 1, vjust = 1),
+        axis.text.y = element_text(size = 18),
+        axis.title = element_text(size = 22, face = "bold"),
+        legend.title = element_text(size = 20, face = "bold"),
+        legend.text = element_text(size = 18),
+        plot.title = element_text(size = 24, face = "bold", hjust = 0.5)
+    )
+
