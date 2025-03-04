@@ -1,0 +1,148 @@
+
+
+
+cvpfop_filt <- subset(cvpfop, idents = c("15", "14", "13", "17"), invert= T)
+
+#option 2
+cvpfop_filt <- FindVariableFeatures(cvpfop_filt)
+cvpfop_filt <- RunPCA(cvpfop_filt, pc.genes = hv.genes, pcs.compute =30 , ndims.print = 1:5, nfeatures.print = 5, genes.print = 5)
+ElbowPlot( cvpfop_filt, ndims = 50)
+cvpfop_filt <- FindNeighbors(cvpfop_filt, reduction = "pca", dims = 1:25, nn.eps = 0.5) 
+cvpfop_filt <- FindClusters(cvpfop_filt, resolution = 0.5, n.start = 10) 
+cvpfop_filt <- RunUMAP(cvpfop_filt, dims = 1:28, min.dist = 0.4)
+DimPlot(cvpfop_filt, reduction = "umap", pt.size = 0.1, label = T, ncol = 3) + ggtitle(label = "UMAP")
+cvpfop_filt <- subset(cvpfop_filt,idents = "7", invert = T  )
+cvpfop_filt.cds <- as.cell_data_set(cvpfop_filt)
+cvpfop_filt.cds <- estimate_size_factors(cvpfop_filt.cds)
+cvpfop_filt.cds <- cluster_cells(cds = cvpfop_filt.cds, reduction_method = "UMAP", cluster_method = 'louvain')
+cvpfop_filt.cds <- learn_graph(cvpfop_filt.cds, use_partition = TRUE)
+cvpfop_filt.cds <- order_cells(cvpfop_filt.cds, reduction_method = "UMAP")
+
+####cvpfop_filt_comment reviewers Keep old labels 
+cvpfop_filt$cell_types <- NA  # First, reset annotations
+
+# Assign old annotations where possible
+valid_cells <- rownames(cvpfop_filt@meta.data) %in% rownames(annocvpfop@meta.data)
+cvpfop_filt$cell_types[valid_cells] <- annocvpfop$cell_types[rownames(cvpfop_filt@meta.data)[valid_cells]]
+
+# Assign "Unknown" to new clusters (or rename them manually)
+cvpfop_filt$cell_types[is.na(cvpfop_filt$cell_types)] <- "Unknown"
+cvpfop_filt <- subset(cvpfop_filt, idents = "Unknown", invert = T )
+table(Idents(cvpfop_filt))  # Should now match `cell_types`
+cvpfop_filt <- RenameIdents(cvpfop_filt, 
+                            "1" = "Basal progenitor",
+                            "2" = "non-taste Lingual EC",
+                            "3" = "Lgr5+ stem cell",
+                            "4" = "Cycling Basal",
+                            "5" = "Krt14+ Basal",
+                            "6" = "Ductal (Saliva)",
+                            "7" = "Intermediate progenitor",
+                            "8" = "Taste (Type-I, III & IV)",
+                            "9" = "Taste (Type-II)")
+
+cvpfop_filt$cell_types[shared_cells] <- annocvpfop$cell_types[shared_cells]
+
+cvpfop_filt$cell_types <- new.cluster.ids[as.numeric(cvpfop_filt$cell_types)]
+
+SeuratChat <- function(Seuratrds, clusters) {
+  # Subset Seurat object by clusters
+  Seuratrds <- subset(Seuratrds, seurat_clusters %in% clusters)
+  
+  # Create SingleCellExperiment object
+  expdata <- as.matrix(Seuratrds@assays$RNA@data)
+  rownames(expdata) <- rownames(Seuratrds@assays$RNA@data)
+  sce <- SingleCellExperiment(assays = list(expdata = expdata), reducedDims = SimpleList(UMAP = Seuratrds@reductions$umap@cell.embeddings))
+  
+  # Add metadata information
+  colData(sce)$Pseudotime <- Seuratrds@meta.data$Pseudotime
+  
+  return(sce)
+}
+
+l5t <- subset(cvpfop_filt, idents =c(4,11,12))
+l5vE <- subset(cvpfop_filt, idents =c(4,10, 6, 7))
+l5t.cds <- as.cell_data_set(l5t)
+l5vE.cds <- as.cell_data_set(l5vE)
+
+sce_l5t <- SeuratChat(cvpfop_filt, c(4,11,12))
+sce_l5vE <- SeuratChat(cvpfop_filt, c(4,10, 6, 7))
+
+sce_l5t <- binarize_exp(sce_l5t, fix_cutoff = TRUE, binarize_cutoff = bn_cutoff)
+sce_l5vE <- binarize_exp(sce_l5vE, fix_cutoff = TRUE, binarize_cutoff = bn_cutoff)
+
+sce_l5t <- find_switch_logistic_fastglm(sce_l5t,downsample = F, show_warning = FALSE)
+sce_l5vE <- find_switch_logistic_fastglm(sce_l5vE,downsample = F, show_warning = FALSE)
+
+
+gs_genelists <- read.csv("Mouse_TFs_Surface.csv")
+genelist <- read.csv("Mouse_TFs.csv")
+sg_allgenes_l5t150 <- filter_switchgenes(sce_l5t, allgenes = TRUE, topnum = 150)
+sg_gtypes_l5t150 <- filter_switchgenes(sce_l5t, allgenes = FALSE, topnum = 150,
+                                genelists = gs_genelists, genetype = c("Surface proteins", "TFs"))
+sg_l5t150 <- rbind(sg_gtypes_l5t150, sg_allgenes_l5t150[setdiff(rownames(sg_allgenes_l5t150), rownames(sg_gtypes_l5t150)),])
+plot_timeline_ggplot(sg_l5t150, timedata = sce_l5t$Pseudotime, txtsize = 3) 
+
+plot_timeline_ggplot(sg_l5vE150, timedata = l5vE.cds$Pseudotime, txtsize = 3) 
+
+sg_allgenes_l5vE150 <- filter_switchgenes(sce_l5vE, allgenes = TRUE, topnum = 100)
+
+sg_gtypes_l5vE150 <- filter_switchgenes(sce_l5vE, allgenes = FALSE, topnum = 150,
+                                genelists = gs_genelists, genetype = c("Surface proteins", "TFs"))
+
+sg_l5vE150 <- rbind(sg_gtypes_l5vE150, sg_allgenes_l5vE150[setdiff(rownames(sg_allgenes_l5vE150), rownames(sg_gtypes_l5vE150)),])
+
+
+Tfidl5t <- c("Hes6", "Elf3", "Zbtb20", "Foxa2", "Prox1", "Plagl1", "Mecp2", "Maff", "Zfp428", "Klf7", "Hsf2", "Sox2")
+
+
+### l5t pseudotime TFs 
+Tfidl5t <- c("Hes6", "Elf3", "Zbtb20", "Foxa2", "Prox1", "Plagl1", "Mecp2", "Maff", "Zfp428", "Klf7", "Hsf2", "Sox2")
+
+l5t.cds <- estimate_size_factors(l5t.cds)
+l5t.cds <- cluster_cells(cds = l5t.cds, reduction_method = "UMAP", cluster_method = 'louvain')
+l5t.cds <- learn_graph(l5t.cds, use_partition = TRUE)
+l5t.cds <- order_cells(l5t.cds, reduction_method = "UMAP")
+cds_subset_l5t <- choose_graph_segments(l5t.cds,clear_cds=FALSE)
+
+cds_subset_l5t <- l5t.cds[row.names(l5t.cds) %in% Tfidl5t]
+gene_fits <- fit_models(cds_subset_l5t, model_formula_str = "~Pseudotime")
+fit_coefs <- coefficient_table(gene_fits)
+time_terms <- fit_coefs %>% filter(term == "Pseudotime")
+time_terms %>% filter (q_value < 0.05) %>%
+  select(gene_id, term, q_value, estimate)
+plot_genes_in_pseudotime(cds_subset_l5t, 
+                         color_cells_by="seurat_clusters",
+                         min_expr=0.5, label_by_short_name = F)
+
+#### l5vE pseudotime TFs 
+Tfidl5vE <- c("Ehf", "Tfcp2l1", "Foxc1", "Barx2", "Sox9")
+
+
+l5vE.cds <- estimate_size_factors(l5vE.cds)
+l5vE.cds <- cluster_cells(cds = l5vE.cds, reduction_method = "UMAP", cluster_method = 'louvain')
+l5vE.cds <- learn_graph(l5vE.cds, use_partition = TRUE)
+l5vE.cds <- order_cells(l5vE.cds, reduction_method = "UMAP")
+
+cds_subset_l5vE <- choose_graph_segments(l5vE.cds,clear_cds=FALSE)
+
+cds_subset_l5vE <- l5vE.cds[row.names(l5vE.cds) %in% Tfidl5vE]
+gene_fits <- fit_models(cds_subset_l5vE, model_formula_str = "~Pseudotime")
+fit_coefs <- coefficient_table(gene_fits)
+time_terms <- fit_coefs %>% filter(term == "Pseudotime")
+time_terms %>% filter (q_value < 0.05) %>%
+  select(gene_id, term, q_value, estimate)
+
+
+
+#### get all TFs down from taste and von ebner and up from basal lgr5 
+
+l5t_TFsdown <- sg_l5t[intersect(which(sg_l5t$direction == "down")
+                 ,which(sg_l5t$feature_type == "TFs")),]
+l5vE_TFsdown <- sg_l5vE[intersect(which(sg_l5vE$direction == "down")
+                                 ,which(sg_l5vE$feature_type == "TFs")),]
+
+
+
+
+
+
