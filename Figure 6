@@ -40,6 +40,47 @@ cvpfop_filt <- RenameIdents(cvpfop_filt,
                             "8" = "Taste (Type-I, III & IV)",
                             "9" = "Taste (Type-II)")
 
+
+
+p6a <- plot_cells(
+   cds = cvpfop_filt.cds,
+   color_cells_by = "cell_types", 
+   show_trajectory_graph = F,
+   labels_per_group = 1,
+   label_cell_groups = F) 
+
+p6b <- plot_cells(
+  cds = cvpfop_filt.cds ,
+  color_cells_by = "pseudotime",
+  show_trajectory_graph = TRUE)
+
+
+
+
+p6a + NoAxes()+
+   theme(
+     axis.title = element_blank(),     # Remove axis titles
+     axis.text = element_blank(),      # Remove axis text
+     axis.ticks = element_blank(),     # Remove axis ticks
+     legend.title = element_text(size = 14),  # Increase size of legend title
+     legend.text = element_text(size = 12),   # Increase size of legend text
+     plot.title = element_text(size = 16, face = "bold"), # Increase plot title size
+     plot.margin = margin(20, 20, 20, 20)  # Increase margin for more space around plot
+   ) 
+
+
+
+ p6b + NoAxes()+
+   theme(
+     axis.title = element_blank(),     # Remove axis titles
+     axis.text = element_blank(),      # Remove axis text
+     axis.ticks = element_blank(),     # Remove axis ticks
+     legend.title = element_text(size = 14),  # Increase size of legend title
+     legend.text = element_text(size = 12),   # Increase size of legend text
+     plot.title = element_text(size = 16, face = "bold"), # Increase plot title size
+     plot.margin = margin(20, 20, 20, 20)  # Increase margin for more space around plot
+   ) 
+
 cvpfop_filt$cell_types[shared_cells] <- annocvpfop$cell_types[shared_cells]
 
 cvpfop_filt$cell_types <- new.cluster.ids[as.numeric(cvpfop_filt$cell_types)]
@@ -140,6 +181,111 @@ l5t_TFsdown <- sg_l5t[intersect(which(sg_l5t$direction == "down")
                  ,which(sg_l5t$feature_type == "TFs")),]
 l5vE_TFsdown <- sg_l5vE[intersect(which(sg_l5vE$direction == "down")
                                  ,which(sg_l5vE$feature_type == "TFs")),]
+
+
+
+Figure 6 g - h
+
+save(dataframe_for_heatmap_l5vE, file= "dataframe_for_heatmap_l5vE.Rda")
+### basal to Lgr5
+
+write.table(dataframe_for_heatmap, "20240108_df_heatmap.csv")
+write.table(dataframe_for_heatmap_l5t, "20240108_df_heatmap_l5t.csv")
+write.table(dataframe_for_heatmap_l5vE, "20240108_df_heatmap_l5vE.csv")
+rm(dataframe_for_heatmap_l5t)
+dataframe_for_heatmap_l5t <- read.table("20240108_df_heatmap_l5t.csv", sep = "")
+dataframe_for_heatmap_l5vE <- read.csv("20240108_df_heatmap_l5vE.csv", sep = "")
+dataframe_for_heatmap_l5vE <- as.data.frame(dataframe_for_heatmap_l5vE)
+
+dataframe_for_heatmap_l5t <- as.data.frame(dataframe_for_heatmap_l5t)
+dataframe_for_heatmap <- data.frame("Pseudotime" = cds_subset_basL5@colData$Pseudotime,
+                                    "Hes6" = monocle3::normalized_counts(cds_subset_basL5)["Hes6",],
+                                    "Elf3" = monocle3::normalized_counts(cds_subset_basL5)["Elf3",],
+                                    "Pax1" = monocle3::normalized_counts(cds_subset_basL5)["Pax1",],
+                                    "Tshz2" = monocle3::normalized_counts(cds_subset_basL5)["Tshz2",],
+                                    "Xpa" = monocle3::normalized_counts(cds_subset_basL5)["Xpa",],
+                                    "Foxe1" = monocle3::normalized_counts(cds_subset_basL5)["Foxe1",],
+                                    "Cenpa" = monocle3::normalized_counts(cds_subset_basL5)["Cenpa",],
+                                    "Tbx3" = monocle3::normalized_counts(cds_subset_basL5)["Tbx3",],
+                                    "Xbp1" = monocle3::normalized_counts(cds_subset_basL5)["Xbp1",],
+                                    "Sox9" = monocle3::normalized_counts(cds_subset_basL5)["Sox9",],
+                                    "Runx1" = monocle3::normalized_counts(cds_subset_basL5)["Runx1",],
+                                    "Tcf4" = monocle3::normalized_counts(cds_subset_basL5)["Tcf4",])
+
+
+dataframe_for_heatmap_l5t <- data.frame("Pseudotime" = cds_subset_l5t@colData$Pseudotime,
+                                    "Klf7" = monocle3::normalized_counts(cds_subset_l5t)["Klf7",],
+                                    "Elf3" = monocle3::normalized_counts(cds_subset_l5t)["Elf3",],
+                                    "Hes6" = monocle3::normalized_counts(cds_subset_l5t)["Hes6",],
+                                    "Prox1" = monocle3::normalized_counts(cds_subset_l5t)["Prox1",],
+                                    "Foxa2" = monocle3::normalized_counts(cds_subset_l5t)["Foxa2",],
+                                    "Zfp428" = monocle3::normalized_counts(cds_subset_l5t)["Zfp428",],
+                                    "Plagl1" = monocle3::normalized_counts(cds_subset_l5t)["Plagl1",],
+                                    "Hsf2" = monocle3::normalized_counts(cds_subset_l5t)["Hsf2",],
+                                    "Maff" = monocle3::normalized_counts(cds_subset_l5t)["Maff",],
+                                    "Sox2" = monocle3::normalized_counts(cds_subset_l5t)["Sox2",],
+                                    "Zbtb20" = monocle3::normalized_counts(cds_subset_l5t)["Zbtb20",],
+                                    "Mecp2" = monocle3::normalized_counts(cds_subset_l5t)["Mecp2",])
+
+
+
+dataframe_for_heatmap_l5vE <- data.frame("Pseudotime" = cds_subset_l5vE@colData$Pseudotime,
+                                        "Tfcp2l1" = monocle3::normalized_counts(cds_subset_l5vE)["Tfcp2l1",],
+                                        "Ehf" = monocle3::normalized_counts(cds_subset_l5vE)["Ehf",],
+                                        "Barx2" = monocle3::normalized_counts(cds_subset_l5vE)["Barx2",],
+                                        "Sox9" = monocle3::normalized_counts(cds_subset_l5vE)["Sox9",],
+                                        "Foxc1" = monocle3::normalized_counts(cds_subset_l5vE)["Foxc1",])
+
+dataframe_for_heatmap_l5t <- t(dataframe_for_heatmap_l5t)
+pheatmap(dataframe_for_heatmap_l5t[c(2:length(rownames(dataframe_for_heatmap_l5t))),
+                               order(dataframe_for_heatmap_l5t["Pseudotime",])],
+         cluster_rows = F, cluster_cols = F, labels_col = F, color = c("blue" ,"lightblue", "lightgoldenrod1",
+                                                                       "white","lightpink", "red", "red",
+                                                                       "red2", "red3","red4")) + 
+  scale_color_manual(values = c("blue", "white", "yellow", "red"))
+
+colorRamp2(seq(from=-2,to=2,length=11),rev(brewer.pal(11, "Spectral")))
+
+pheatmap(dataframe_for_heatmap[c(2:length(rownames(dataframe_for_heatmap))),
+                               order(dataframe_for_heatmap["Pseudotime",])], 
+         cluster_rows = F, cluster_cols = F, labels_col = F, color = colorRampPalette(c("navy", "white", "red"))(50))
+         
+
+
+
+##from github
+cds <- cds_subset_l5t
+pt.matrix <- as.matrix(dataframe_for_heatmap_l5t[-1,][,order(dataframe_for_heatmap_l5t["Pseudotime",])])
+pt.matrix <- apply(dataframe_for_heatmap_l5t[-1,],1,function(x){smooth.spline(x, y = dataframe_for_heatmap_l5t[1,],df=4)$y})
+pt.matrix_2 <- t(apply(pt.matrix,1,function(x){(x-mean(x))/sd(x)}))
+pt.matrix[,"Pseudotime"] <- dataframe_for_heatmap_l5t[,]
+
+pt.matrix <- t(apply(pt.matrix,1,function(x){smooth.spline(x,df=3)$y}))
+pt.matrix <- t(apply(pt.matrix,1,function(x){(x-mean(x))/sd(x)}))
+##example
+ht <- Heatmap(
+  pt.matrix,
+  name                         = "z-score",
+  col                          = colorRamp2(seq(from=-2,to=2,length=11),rev(brewer.pal(11, "Spectral"))),
+  show_row_names               = TRUE,
+  show_column_names            = FALSE,
+  row_names_gp                 = gpar(fontsize = 6),
+  km = 6,
+  row_title_rot                = 0,
+  cluster_rows                 = TRUE,
+  cluster_row_slices           = FALSE,
+  cluster_columns              = FALSE)
+cprint(ht)
+
+new_matrix <- apply(dataframe_for_heatmap_l5t[-1,order(dataframe_for_heatmap_l5t["Pseudotime", ])],1, function(x){runmed(x,51)})
+pheatmap::pheatmap(pt.matrix, 
+                   cluster_rows = F, 
+                   cluster_cols = F, 
+                   labels_col = F,
+                   color = colorRampPalette(rev(brewer.pal(11, "Spectral")))(50))
+
+pheatmap::pheatmap(pt.matrix[c(2:length(rownames(pt.matrix))),order(pt.matrix["Pseudotime",])], cluster_rows = F, cluster_cols = F, labels_col = F, color = colorRamp2(rev(brewer.pal(11, "Spectral")))
+seq(from=-2,to=3,length=11),
 
 
 
