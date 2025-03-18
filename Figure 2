@@ -23,6 +23,40 @@ ggplotColours <- function(n = 6, h = c(0, 360) + 15){
 
 clust.cols <- ggplotColours(n=6)
 
+#### Fig. 2a 
+taste$cell_types <- taste@active.ident
+# Set newly annotated cell types
+taste$cell_types[colnames(taste)] <- taste$cell_types
+DimPlot(taste, reduction = "umap", group.by = "cell_types")
+
+# Create UMAP projection plots per condition
+plotx <- DimPlot(taste, reduction = "umap", group.by = "cell_types", , label = T, label.box = T ) +
+  scale_color_manual(values = clust.cols) +
+  theme_void() + NoLegend() +
+  scale_shape_manual(values = c(21))
+
+
+plotx[[1]]$data
+plot(plotx)
+
+
+#### Fig 2b  
+vonEbner$cell_types <- vonEbner@active.ident
+# Set newly annotated cell types
+vonEbner$cell_types[colnames(vonEbner)] <- vonEbner$cell_types
+DimPlot(vonEbner, reduction = "umap", group.by = "cell_types")
+Colours <- function(n = 6, h = c(0, 360) + 15){
+  if ((diff(h) %% 360) < 1) h[2] <- h[2] - 360/n
+  hcl(h = (seq(h[1], h[2], length = n)), c = 100, l = 65)
+}
+
+clust.cols <- ggplotColours(n=10)
+# Create UMAP projection plots per condition
+plotx <- DimPlot(vonEbner, reduction = "umap", group.by = "cell_types", , label = T, label.box = T, Label.size = 8 ) +
+  scale_color_manual(values = clust.cols) +
+  theme_void() + NoLegend() +
+  scale_shape_manual(values = c(21))
+plot(plotx)
 
 
 
@@ -48,6 +82,36 @@ saliva <- RenameIdents(object = saliva, new.cluster.ids)
 
 saliva.Markers <- FindAllMarkers(saliva, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
 
+
+
+#### Fig 2c
+
+cluster_taste_fig2c <- c("Tas2r118","Tas2r120", "Tas2r138", "Tas1r1", "Tas1r2", "Tas1r3","Snap25","Car4", "Trpm5", "Gnat3", "Gna14", "Entpd2", "Krt8", "Krt19", "Sox2", "Lgr5", "Shh")
+
+p <- DotPlot_scCustom(taste , features = cluster_taste_fig2c)
+data <- p$data
+
+ggplot2::ggplot(data, ggplot2::aes(y = id, x = features.plot, size = pct.exp, fill = avg.exp.scaled)) +
+  ggplot2::geom_point(shape=21)+
+  ggplot2::theme_bw() +
+  ggplot2::scale_size_area(max_size = 10) +
+  ggplot2::scale_fill_gradient2(low="blue3",high="red3",mid="white",limits=c(-2.5,2.5)) +
+  ggplot2::labs(fill="Relative expression", size = "Percent expressed") +
+  ggplot2::xlab("Cluster") +
+  ggplot2::ylab("Gene") +
+  ggplot2::theme(axis.text.y = ggplot2::element_text(size=18,color=clust.cols),
+                 axis.text.x = ggplot2::element_text(size=18,angle = 45, hjust=1),
+                 axis.title = ggplot2::element_text(size=0),
+                 legend.title=ggplot2::element_text(size=16),
+                 legend.text = ggplot2::element_text(size=12),
+                 legend.position = "bottom",
+                 panel.background = ggplot2::element_rect(colour = "black", size=1)+
+  ggplot2::guides(size=ggplot2::guide_legend(ncol=2, title.position = "top"),
+                  fill=ggplot2::guide_colorbar(title.position = "top", label.position = "top")))
+
+
+
+#### Fig 2d 
 
 ####https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7718488/ 
 #### GSE150327 dataset --> Postnatal SMG Integrated.rds
@@ -120,6 +184,9 @@ vonEbner <- AddModuleScore(vonEbner,
 vonEbner <- AddModuleScore(vonEbner, 
                            features = list(row.names(top100.seromucus)), ctrl =100, 
                            name = "seromucus_score"    
+
+
+
 
 
 #### figure S2
