@@ -1,3 +1,28 @@
+##TASTE cvp fop
+taste <- subset(cvpfop1, idents = c("9", "10"))
+taste <- NormalizeData(object = taste, normalization.method = "LogNormalize", scale.factor = 10000)
+taste <- FindVariableFeatures(taste)
+taste <- RunPCA(taste, pc.genes = hv.genes, pcs.compute =12 , ndims.print = 1:5, nfeatures.print = 5, genes.print = 5)
+ElbowPlot( taste, ndims = 50)
+#Jaccard similarity & Louvain algorithme 
+taste<- FindNeighbors(taste, reduction = "pca", dims = 1:12, nn.eps = 0.5) 
+taste <- FindClusters(taste, resolution = 0.4, n.start = 10) 
+
+taste.Markers <- FindAllMarkers(taste, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+
+new.cluster.ids = c("Type-I", "Type-III","Type-II", "Type-IV", "Type-I", "Type-II(bitter)","Type-II(sweet/umami)")
+names(x = new.cluster.ids) <- levels(x = taste)
+tasteanno <- RenameIdents(object = taste, new.cluster.ids)
+
+
+
+ggplotColours <- function(n = 6, h = c(0, 360) + 15){
+  if ((diff(h) %% 360) < 1) h[2] <- h[2] - 360/n
+  hcl(h = (seq(h[1], h[2], length = n)), c = 100, l = 65)
+}
+
+clust.cols <- ggplotColours(n=6)
+
 
 
 
