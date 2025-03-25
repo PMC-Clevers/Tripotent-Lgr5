@@ -1,3 +1,29 @@
+#### a 
+
+dotplot <- c("Krt8", "Sox2", "Sox9", "Lgr5")
+ggplot2::ggplot(data, ggplot2::aes(y = id, x = features.plot, size = pct.exp, fill = avg.exp.scaled)) +
+  ggplot2::geom_point(shape=21)+
+  ggplot2::theme_bw() +
+  ggplot2::scale_size_area(max_size = 10) +
+  ggplot2::scale_fill_gradient2(low="blue3",high="red3",mid="white",limits=c(-2.5,2.5)) +
+  ggplot2::labs(fill="Relative expression", size = "Percent expressed") +
+  ggplot2::xlab("Cluster") +
+  ggplot2::ylab("Gene") +
+  ggplot2::theme(axis.text.y = ggplot2::element_text(size=18,color=clust.cols),
+                 axis.text.x = ggplot2::element_text(size=18,angle = 45, hjust=1),
+                 axis.title = ggplot2::element_text(size=0),
+                 legend.title=ggplot2::element_text(size=18),
+                 legend.text = ggplot2::element_text(size=18),
+                 legend.position = "bottom",
+                 panel.background = ggplot2::element_rect(colour = "black", size=1)+
+                   ggplot2::guides(size=ggplot2::guide_legend(ncol=2, title.position = "top"),
+                                   fill=ggplot2::guide_colorbar(title.position = "top", label.position = "top")))
+
+
+
+
+#### b
+
 lgr5.markers <- FindMarkers(annocvpfop, ident.1 = 'Lgr5+ stem cell', min.pct = 0.25)
 write.csv(lgr5.markers, "20240502_lgr5_stemcellmarkers.csv")
 lgr5.markers <- read.csv("20240502_lgr5_stemcellmarkers.csv")
