@@ -1,0 +1,7 @@
+lgr5.markers <- FindMarkers(annocvpfop, ident.1 = 'Lgr5+ stem cell', min.pct = 0.25)
+write.csv(lgr5.markers, "20240502_lgr5_stemcellmarkers.csv")
+lgr5.markers <- read.csv("20240502_lgr5_stemcellmarkers.csv")
+top40.lgr5markers <- lgr5.markers %>%  slice_max(n = 40, order_by = avg_log2FC)
+
+top40.lgr5heatmap <- top40.lgr5markers$X
+DoHeatmap(subset(annocvpfop, downsample = 100), features = top40.lgr5heatmap, size = 3) 
