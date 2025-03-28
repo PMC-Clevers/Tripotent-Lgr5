@@ -1,0 +1,40 @@
+##importing from GSE database with csv file 
+countsData <- read.csv(file = "GSE191169_read_count_matrix.csv", header = TRUE, row.names = 1) ##https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE191169
+so.combined <- CreateSeuratObject(counts = countsData, project = "GSE191169", min.cells = 3, min.features = 200)
+so.combined[["percent.mt"]] <- PercentageFeatureSet(so.combined, pattern = "^mt-")
+so.combined <- ScaleData(so.combined, vars.to.regress = "percent.mt")
+VlnPlot(primorg.combined, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+#####supplementary figure 4a 
+DimPlot(so.combined, reduction = 'umap', split.by= 'origin')
+
+
+#####supplementary figure 4b-c
+
+clustereib.markers <- FindMarkers(annocvpfop, ident.1 = "Saliva/von Eibner(12)", ident.2 = NULL, min.pct = 0.25)
+head(clustereib.markers, n = 100)
+clusteraci.markers <- FindMarkers(annocvpfop, ident.1 = "Saliva(acinar)(25)", ident.2 = NULL, min.pct = 0.25)
+cluster10.markers <- FindMarkers(so.combined, ident.1 = "10", ident.2 = NULL, min.pct = 0.25)
+cluster11.markers <- FindMarkers(so.combined, ident.1 = "11", ident.2 = NULL, min.pct = 0.25)
+
+top100.clustereibmarkerss<- clustereib.markers %>%  slice_max(n = 100, order_by = avg_log2FC)
+top100.clusteracimarkerss<- clusteraci.markers %>%  slice_max(n = 100, order_by = avg_log2FC)
+
+so.combined@meta.data <- so.combined@meta.data[,-grep("acinar_", colnames(so.combined@meta.data))]
+so.combined <- AddModuleScore(so.combined, 
+                                     features = list(row.names(top100.clustereibmarkerss)), ctrl =100, 
+                                     name = "eibner_score"                                ) 
+so.combined <- AddModuleScore(so.combined, 
+                              features = list(row.names(top100.clusteracimarkerss)), ctrl =100, 
+                              name = "acinar_score"                                ) 
+library(RColorBrewer)
+FeaturePlot(so.combined, features = "eibner_score1", reduction = "umap", pt.size = 0.1) +
+  scale_color_gradientn(colors = rev(brewer.pal(n=8, name="PuOr")))
+FeaturePlot(so.combined, features = "acinar_score1", reduction = "umap", pt.size = 0.1) +
+  scale_color_gradientn(colors = rev(brewer.pal(n=8, name="PuOr")))
+VlnPlot(so.combined, features = "acinar_score1", pt.size = 0) + NoLegend()
+
+
+#####supplementary figure 4d
+salivabased= c("Dcpp1", "Dcpp3","Aqp5", "Bhlha15", "Krt19","Krt8", "Krt7", "Muc19", "Cldn2","Acta2")
+DoHeatmap(subset(so.combined , downsample = 100), features = salivabased, size = 3) & scale_color_gradientn(colors = rev(brewer.pal(n=8, name="PuOr")))
