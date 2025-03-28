@@ -1,0 +1,142 @@
+#==========================================
+# Figure 7 - Transcriptomic Effects of Foxe1 Knockout
+#==========================================
+
+# Load required libraries
+library(DESeq2)
+library(EnhancedVolcano)
+library(pheatmap)
+library(ggplot2)
+library(viridis)
+library(RColorBrewer)
+library(fgsea)
+library(reshape2)
+library(scales)
+library(dplyr)
+llbrary(Seurat)
+
+#------------------------------------------
+# 1. Load raw counts and metadata
+#------------------------------------------
+data <- read.table("readcounts_raw.csv", stringsAsFactors = FALSE, fill = TRUE)
+sampleinfo <- read.table("Foxe1_coldata.txt")
+
+#------------------------------------------
+# 2. Filter low count genes
+#------------------------------------------
+datafil <- data[which(rowSums(data) > 50),]  # Pre-filtering
+
+#------------------------------------------
+# 3. DESeq2 differential expression analysis
+#------------------------------------------
+dds <- DESeqDataSetFromMatrix(datafil, sampleinfo, ~Condition)
+ddsDE <- DESeq(dds)
+resFoxe1 <- results(ddsDE, alpha = 0.05)
+
+# Subset significant genes
+sigGenes <- subset(resFoxe1, abs(log2FoldChange) >= 1 & padj < 0.01)
+
+#------------------------------------------
+# 4. Data transformations for visualization
+#------------------------------------------
+ntd <- normTransform(ddsDE)
+rld <- rlog(ddsDE)
+vsd <- vst(ddsDE, blind = FALSE)
+
+#------------------------------------------
+# 5. Volcano plot
+#------------------------------------------
+EnhancedVolcano(resFoxe1,
+                lab = rownames(resFoxe1),
+                x = 'log2FoldChange',
+                y = 'pvalue')
+
+#------------------------------------------
+# 6. PCA plot (Fig. 7d)
+#------------------------------------------
+plotPCA(vsd, intgroup = c("Condition"), ntop = 5000) +
+  theme_bw() +
+  theme_classic() +
+  scale_color_manual(values = c("blue", "red", "green", "gray", "black")) +
+  ggtitle("PCA plot WT vs Foxe1-/-") +
+  geom_label_repel(aes(label = row.names(sampleinfo)))
+
+#------------------------------------------
+# 7. Sample distance heatmap
+#------------------------------------------
+sampleDists <- dist(t(assay(vsd)))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- paste(vsd$Condition, vsd$Origin, sep = "-")
+colors <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows = sampleDists,
+         clustering_distance_cols = sampleDists,
+         col = colors)
+
+#------------------------------------------
+# 8. Heatmaps of top differentially expressed genes (Fig. 7e)
+#------------------------------------------
+interesting_rows_up <- order(sigGenes$log2FoldChange, decreasing = TRUE)[1:100]
+interesting_rows_down <- order(sigGenes$log2FoldChange, decreasing = FALSE)[1:100]
+
+# Supplementary Figure 10b: Top 50 up and top 30 down
+interesting_rows_combined <- c(order(sigGenes$log2FoldChange, decreasing = TRUE)[1:50],
+                               rev(order(sigGenes$log2FoldChange, decreasing = FALSE)[1:30]))
+pheatmap(assay(ntd)[rownames(sigGenes[interesting_rows_combined,]),],
+         cluster_rows = TRUE,
+         cluster_cols = FALSE,
+         show_rownames = TRUE,
+         color = colorRampPalette(rev(brewer.pal(8, name = "PuOr")))(255),
+         scale = "row",
+         main = "WT vs Foxe1 K/O - Top 50 Up, Top 30 Down")
+
+#------------------------------------------
+# 9. Heatmap of selected functionally relevant genes
+#------------------------------------------
+interesting_genes <- c("Lyz2", "Tff2", "Dmbt1", "Muc16", "Muc5b", "Muc5ac",
+                       "Aqp5", "Bpifa1", "Krt14", "Krt13", "Sprr1b", "Krt19",
+                       "Krt20", "Cldn6", "Gna14", "Tas1r3", "Otop1",
+                       "Lgr5", "Lgr6", "Sox9")
+
+pheatmap(assay(ntd)[interesting_genes, ],
+         cluster_rows = TRUE,
+         cluster_cols = FALSE,
+         show_rownames = TRUE,
+         color = colorRampPalette(rev(brewer.pal(8, name = "PuOr")))(255),
+         scale = "row",
+         main = "Expression of Selected Genes")
+
+#------------------------------------------
+# 10. Module scoring in Seurat objects (Fig. 7f-j)
+#------------------------------------------
+# Genes for WT-high and KO-high
+genesup <- rownames(sigGenes[interesting_rows_up])
+genesdown <- rownames(sigGenes[interesting_rows_down])
+
+# Add module scores to cvpfop
+cvpfop <- AddModuleScore(cvpfop, features = list(genesup), name = "Foxe1_score", ctrl = 100)
+cvpfop <- AddModuleScore(cvpfop, features = list(genesdown), name = "knockout_score", ctrl = 100)
+
+# Add module scores to vonEbner
+vonEbner <- AddModuleScore(vonEbner, features = list(genesup), name = "Foxe1_score", ctrl = 100)
+vonEbner <- AddModuleScore(vonEbner, features = list(genesdown), name = "knockout_score", ctrl = 100)
+
+# Add module scores to taste
+taste <- AddModuleScore(taste, features = list(genesup), name = "Foxe1_score", ctrl = 100)
+taste <- AddModuleScore(taste, features = list(genesdown), name = "knockout_score", ctrl = 100)
+
+# UMAP visualizations
+FeaturePlot(cvpfop, features = "Foxe1_score1", pt.size = 0.1) +
+  scale_color_gradientn(colors = rev(brewer.pal(11, "Spectral")))
+FeaturePlot(cvpfop, features = "knockout_score1", pt.size = 0.1) +
+  scale_color_gradientn(colors = rev(brewer.pal(11, "Spectral")))
+
+FeaturePlot(vonEbner, features = "Foxe1_score1", pt.size = 0.1) +
+  scale_color_gradientn(colors = rev(brewer.pal(11, "Spectral")))
+FeaturePlot(vonEbner, features = "knockout_score1", pt.size = 0.1) +
+  scale_color_gradientn(colors = rev(brewer.pal(11, "Spectral")))
+
+FeaturePlot(taste, features = "Foxe1_score1", pt.size = 0.1) +
+  scale_color_gradientn(colors = rev(brewer.pal(11, "Spectral")))
+FeaturePlot(taste, features = "knockout_score1", pt.size = 0.1) +
+  scale_color_gradientn(colors = rev(brewer.pal(11, "Spectral")))
