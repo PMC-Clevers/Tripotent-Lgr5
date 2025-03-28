@@ -1,0 +1,169 @@
+#==========================================
+# Figure 2 - Taste & Salivary Lineage Subclustering
+#==========================================
+
+# Load necessary libraries
+library(Seurat)
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+library(scCustomize)
+library(clusterProfiler)
+library(org.Mm.eg.db)
+
+#==========================================
+# Taste cell subsetting & clustering
+#==========================================
+taste <- subset(cvpfop, idents = c("9", "10"))
+taste <- NormalizeData(taste)
+taste <- FindVariableFeatures(taste)
+taste <- RunPCA(taste, npcs = 12)
+ElbowPlot(taste, ndims = 50)
+taste <- FindNeighbors(taste, dims = 1:12)
+taste <- FindClusters(taste, resolution = 0.4)
+taste.Markers <- FindAllMarkers(taste, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+
+# Rename clusters
+new.cluster.ids <- c("Type I", "Type III", "Type II", "Type IV", "Type I", "Type II(bitter)", "Type II(sweet/umami)")
+names(new.cluster.ids) <- levels(taste)
+taste <- RenameIdents(taste, new.cluster.ids)
+taste$cell_types <- taste@active.ident
+
+#==========================================
+# Figure 2a - UMAP of taste cell types
+#==========================================
+clust.cols <- hcl(h = seq(15, 375, length = 7), l = 65, c = 100)[1:7]
+DimPlot(taste, group.by = "cell_types", label = TRUE, label.box = TRUE) +
+  scale_color_manual(values = clust.cols) +
+  theme_void() + NoLegend()
+
+#==========================================
+# Figure 2b - Von Ebner UMAP
+#==========================================
+
+vonEbner <- subset(cvpfop, idents = c("11", "5", "7") )
+vonEbner <- NormalizeData(object = vonEbner, normalization.method = "LogNormalize", scale.factor = 10000)
+vonEbner <- FindVariableFeatures(vonEbner)
+vonEbner<- RunPCA(vonEbner, pc.genes = hv.genes, pcs.compute =15 , ndims.print = 1:5, nfeatures.print = 5, genes.print = 5)
+ElbowPlot( vonEbner, ndims = 50)
+#Jaccard similarity & Louvain algorithme 
+vonEbner<- FindNeighbors(vonEbner, reduction = "pca", dims = 1:15, nn.eps = 0.5) 
+vonEbner <- FindClusters(vonEbner, resolution = 0.4, n.start = 10)
+vonEbner <- RunUMAP(vonEbner, dims = 1:15, min.dist = 0.5)
+DimPlot(vonEbneranno, reduction= "umap", label=T)
+VlnPlot(vonEbneranno, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+vonEbner.Markers <- FindAllMarkers(vonEbner, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+##badquality cluster
+vonEbner <- subset(vonEbner, idents = "6", invert = T)
+
+
+new.cluster.ids = c("Basal duct(Krt5/Krt14)", "Basal duct(Krt14)","Ductal","Ductal/Serous", "Myo-epithelial", "Acinar (Serous) ","Acinar (mucus)", "Prolif. Endbud", "Diff. Ductal" )
+names(x = new.cluster.ids) <- levels(x = vonEbner)
+vonEbneranno <- RenameIdents(object = vonEbner, new.cluster.ids)
+vonEbner$cell_types <- vonEbner@active.ident
+clust.cols <- hcl(h = seq(15, 375, length = 10), l = 65, c = 100)[1:10]
+DimPlot(vonEbner, group.by = "cell_types", label = TRUE, label.box = TRUE) +
+  scale_color_manual(values = clust.cols) +
+  theme_void() + NoLegend()+NoAxes()
+
+vonEbner <- readRDS("20230811_vonEbner_anno.rds")
+#==========================================
+# Figure 2c - Taste DotPlot
+#==========================================
+cluster_taste_fig2c <- c("Tas2r118", "Tas2r120", "Tas2r138", "Tas1r1", "Tas1r2", "Tas1r3",
+                         "Snap25", "Car4", "Trpm5", "Gnat3", "Gna14", "Entpd2", "Krt8",
+                         "Krt19", "Sox2", "Lgr5", "Shh")
+
+p <- DotPlot_scCustom(taste, features = cluster_taste_fig2c)
+data <- p$data
+
+ggplot(data, aes(y = id, x = features.plot, size = pct.exp, fill = avg.exp.scaled)) +
+  geom_point(shape = 21) +
+  theme_bw() +
+  scale_size_area(max_size = 10) +
+  scale_fill_gradient2(low = "blue3", high = "red3", mid = "white", limits = c(-2.5, 2.5)) +
+  labs(fill = "Relative expression", size = "Percent expressed") +
+  theme(axis.text.y = element_text(size = 18, color = clust.cols),
+        axis.text.x = element_text(size = 18, angle = 45, hjust = 1),
+        legend.title = element_text(size = 16),
+        legend.text = element_text(size = 12),
+        legend.position = "bottom")
+
+#==========================================
+# Figure 2d - Module scoring using Postnatal SMG dataset
+#==========================================
+postnatalSMG <- readRDS("Postnatal SMG Integrated.rds")
+DimPlot(postnatalSMG, reduction = 'umap')
+
+striated.markers <- FindMarkers(postnatalSMG, ident.1 = "Striated duct", ident.2 = NULL, min.pct = 0.25)
+intercalated.markers <- FindMarkers(postnatalSMG, ident.1 = "Intercalated duct", ident.2 = NULL, min.pct = 0.25)
+GCT.markers <- FindMarkers(postnatalSMG, ident.1 = "GCT", ident.2 = NULL, min.pct = 0.25)
+serousacinar.markers <- FindMarkers(postnatalSMG, ident.1 = "Serous acinar", ident.2 = NULL, min.pct = 0.25)
+seromucus.markers <- FindMarkers(postnatalSMG, ident.1 = "Seromucous acinar", ident.2 = NULL, min.pct = 0.25)
+k19duct.markers <- FindMarkers(postnatalSMG, ident.1 = "Krt19+ duct", ident.2 = NULL, min.pct = 0.25)
+myo.markers  <- FindMarkers(postnatalSMG, ident.1 = "Myoepithelial", ident.2 = NULL, min.pct = 0.25)
+Basal.markers  <- FindMarkers(postnatalSMG, ident.1 = "Basal duct", ident.2 = NULL, min.pct = 0.25)
+
+
+top100.basalduct<- Basal.markers %>%  slice_max(n = 100, order_by = avg_log2FC)
+
+top100.striated<- striated.markers %>%  slice_max(n = 100, order_by = avg_log2FC)
+top100.intercalated<- intercalated.markers %>%  slice_max(n = 100, order_by = avg_log2FC)
+top100.GCT<- GCT.markers %>%  slice_max(n = 100, order_by = avg_log2FC)
+top100.serous<- serousacinar.markers %>%  slice_max(n = 100, order_by = avg_log2FC)
+top100.seromucus<- seromucus.markers %>%  slice_max(n = 100, order_by = avg_log2FC)
+top100.k19duct<- k19duct.markers %>%  slice_max(n = 100, order_by = avg_log2FC)
+top100.myo<- myo.markers %>%  slice_max(n = 100, order_by = avg_log2FC)
+
+
+write.csv(top100.basalduct, "20240724_top100_basalduct.csv")
+write.csv(top100.striated, "20240724_top100_striated.csv")
+write.csv(top100.intercalated, "20240724_top100_intercalated.csv")
+write.csv(top100.GCT, "20240724_top100_GCT.csv")
+write.csv(top100.serous, "20240724_top100_serous.csv")
+write.csv(top100.seromucus, "20240724_top100_seromucus.csv")
+write.csv(top100.k19duct, "20240724_top100_k19duct.csv")
+write.csv(top100.myo, "20240724_top100_myo.csv")
+
+
+
+vonEbner@meta.data <- vonEbner@meta.data[,-grep("striated_", colnames(vonEbner@meta.data))]
+vonEbner@meta.data <- vonEbner@meta.data[,-grep("intercalated_", colnames(vonEbner@meta.data))]
+vonEbner@meta.data <- vonEbner@meta.data[,-grep("GCT_", colnames(vonEbner@meta.data))]
+vonEbner@meta.data <- vonEbner@meta.data[,-grep("serous_", colnames(vonEbner@meta.data))]
+vonEbner@meta.data <- vonEbner@meta.data[,-grep("seromucus_", colnames(vonEbner@meta.data))]
+vonEbner@meta.data <- vonEbner@meta.data[,-grep("K19duct_", colnames(vonEbner@meta.data))]
+vonEbner@meta.data <- vonEbner@meta.data[,-grep("myo_", colnames(vonEbner@meta.data))]
+vonEbner@meta.data <- vonEbner@meta.data[,-grep("basalduct_", colnames(vonEbner@meta.data))]
+
+
+vonEbner <- AddModuleScore(vonEbner, 
+                           features = list(row.names(top100.basalduct)), ctrl =100, 
+                           name = "basalduct_score" )
+vonEbner <- AddModuleScore(vonEbner, 
+                              features = list(row.names(top100.striated)), ctrl =100, 
+                              name = "striated_score"                                ) 
+vonEbner <- AddModuleScore(vonEbner, 
+                           features = list(row.names(top100.intercalated)), ctrl =100, 
+                           name = "intercalated_score"                                ) 
+vonEbner <- AddModuleScore(vonEbner, 
+                           features = list(row.names(top100.GCT)), ctrl =100, 
+                           name = "GCT_score"                                )                             
+vonEbner <- AddModuleScore(vonEbner, 
+                           features = list(row.names(top100.k19duct)), ctrl =100, 
+                           name = "k19duct_score"                                ) 
+vonEbner <- AddModuleScore(vonEbner, 
+                           features = list(row.names(top100.myo)), ctrl =100, 
+                           name = "myo_score"                                ) 
+vonEbner <- AddModuleScore(vonEbner, 
+                           features = list(row.names(top100.serous)), ctrl =100, 
+                           name = "serous_score"                                )
+vonEbner <- AddModuleScore(vonEbner, 
+                           features = list(row.names(top100.seromucus)), ctrl =100, 
+                           name = "seromucus_score"                                ) 
+library(RColorBrewer)
+FeaturePlot(so.combined, features = "eibner_score1", reduction = "umap", pt.size = 0.1) +
+  scale_color_gradientn(colors = rev(brewer.pal(n=8, name="PuOr")))
+FeaturePlot(so.combined, features = "acinar_score1", reduction = "umap", pt.size = 0.1) +
+  scale_color_gradientn(colors = rev(brewer.pal(n=8, name="PuOr")))
+VlnPlot(so.combined, features = "acinar_score1", pt.size = 0) + NoLegend()
