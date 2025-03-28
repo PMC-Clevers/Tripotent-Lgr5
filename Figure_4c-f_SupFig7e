@@ -1,0 +1,125 @@
+#==========================================
+# Figure 4 - Lgr5 stem cell is capable of forming non-taste lingual epithelium, salivary gland and taste bud lineages. 
+#==========================================
+
+# Load necessary libraries
+library(Signac)
+library(Seurat)
+library(SeuratData)
+library(scater)
+library(SeuratWrappers)
+library(monocle3)
+library(monocle)
+library(Matrix)
+library(ggplot2)
+library(patchwork)
+library(GeneSwitches)
+library(SingleCellExperiment)
+library(dplyr)
+library(viridis)
+library(ggrepel)
+library(RColorBrewer)
+library(slingshot)
+library(tradeSeq)
+library(pheatmap)
+library(circlize)
+library(scCustomize)
+
+#==========================================
+# Load and preprocess clonal data
+#==========================================
+c1 <- Read10X("LX594_an855_filtered_feature_bc_matrix/")
+c3 <- Read10X("LX595_an856_filtered_feature_bc_matrix/")
+c7 <- Read10X("LX596_an857_filtered_feature_bc_matrix/")
+
+so_c1 <- CreateSeuratObject(counts = c1, project = "Clone1", min.cells = 3, min.features = 200)
+so_c3 <- CreateSeuratObject(counts = c3, project = "Clone3", min.cells = 3, min.features = 200)
+so_c7 <- CreateSeuratObject(counts = c7, project = "Clone7", min.cells = 3, min.features = 200)
+
+so.combined <- merge(so_c1, y = c(so_c3, so_c7), add.cell.ids = c("Clone1", "Clone3", "Clone7"))
+so.combined[["percent.mt"]] <- PercentageFeatureSet(so.combined, pattern = "^mt-")
+
+# QC filtering
+so.combined <- subset(so.combined, subset = nFeature_RNA > 200 & nFeature_RNA < 7500 & percent.mt < 30)
+
+# Normalize and scale
+so.combined <- NormalizeData(so.combined)
+so.combined <- FindVariableFeatures(so.combined)
+so.combined <- ScaleData(so.combined)
+
+# PCA and clustering
+so.combined <- RunPCA(so.combined)
+so.combined <- FindNeighbors(so.combined, dims = 1:20)
+so.combined <- FindClusters(so.combined, resolution = 0.5)
+so.combined <- RunUMAP(so.combined, dims = 1:18, reduction.name = "umap.unintegrated")
+
+# Rename clusters
+new.cluster.ids <- c("Lgr5/6-precursor", "non-taste Lingual EC", "Intermediate#1", "Intermediate#2", 
+                     "Taste and Saliva", "cycling Basal")
+names(new.cluster.ids) <- levels(so.combined)
+so.combined <- RenameIdents(so.combined, new.cluster.ids)
+
+# Save Seurat object
+saveRDS(so.combined, "20240618_lgr5_clonesc_137.rds")
+
+#==========================================
+# Marker Visualization - DotPlot (Figure 4d)
+#==========================================
+annomarkers <- c("Foxa1", "Kcnq1", "Gna14", "Entpd2", "Hes6", "Krt8", "Krt19", "Krt7", "Ltf",
+                 "Cldn10", "Aqp5", "Muc16", "Kit", "Krt5", "Krt14", "Trp63", "Mki67",
+                 "Krt4", "Krt13", "Sprr1b", "Lgr5", "Lgr6", "Acta2", "Cd34", "Sox9", "Sox2")
+
+p <- DotPlot_scCustom(so.combined, features = annomarkers)
+clust.cols <- ggplotColours(n = length(levels(so.combined)))
+data <- p$data
+
+ggplot(data, aes(y = id, x = features.plot, size = pct.exp, fill = avg.exp.scaled)) +
+  geom_point(shape = 21) +
+  theme_bw() +
+  scale_size_area(max_size = 10) +
+  scale_fill_gradient2(low = "blue3", high = "red3", mid = "white", limits = c(-2.5, 2.5)) +
+  labs(fill = "Relative expression", size = "Percent expressed") +
+  xlab("Cluster") +
+  ylab("Gene") +
+  theme(
+    axis.text.y = element_text(size = 12, color = clust.cols),
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+    axis.title = element_text(size = 0),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 12),
+    legend.position = "bottom",
+    panel.background = element_rect(colour = "black", size = 1)) +
+  guides(size = guide_legend(ncol = 2, title.position = "top"),
+         fill = guide_colorbar(title.position = "top", label.position = "top"))
+
+#==========================================
+# Integration with Primary Tissue (Figure 4e-f-g)
+#==========================================
+annocvpfop <- readRDS("TX/20230810_annocvpfop.rds")
+so.combined[["RNA"]] <- split(so.combined[["RNA"]], f = so.combined$orig.ident)
+primorg.combined <- merge(so.combined, annocvpfop)
+primorg.combined <- SCTransform(primorg.combined)
+primorg.combined <- RunPCA(primorg.combined)
+primorg.combined <- IntegrateLayers(primorg.combined, method = CCAIntegration, orig.reduction = "pca", 
+                                    new.reduction = "integrated.cca", normalization.method = "SCT")
+primorg.combined <- RunUMAP(primorg.combined, reduction = "integrated.cca", dims = 1:10, reduction.name = "umap.cca")
+
+# Re-annotate and plot
+primorg.combined$cell_types <- primorg.combined@active.ident
+DimPlot(primorg.combined, reduction = "umap.cca", group.by = "cell_types")
+
+# Barplot of proportions (Figure 4g)
+# (Assumes `cell_counts` has Sample, Count, Cell_Type columns)
+cell_counts <- cell_counts %>% group_by(Sample) %>% mutate(Proportion = Count / sum(Count))
+
+ggplot(cell_counts, aes(x = Sample, y = Proportion, fill = Cell_Type)) +
+  geom_bar(stat = "identity", position = "fill") +
+  scale_fill_manual(values = clust.cols) +
+  theme_minimal(base_size = 18) +
+  labs(title = "Cell Type Proportions Per Sample", x = "Sample", y = "Proportion") +
+  theme(axis.text.x = element_text(size = 18, angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 18),
+        axis.title = element_text(size = 22, face = "bold"),
+        legend.title = element_text(size = 20, face = "bold"),
+        legend.text = element_text(size = 18),
+        plot.title = element_text(size = 24, face = "bold", hjust = 0.5))
