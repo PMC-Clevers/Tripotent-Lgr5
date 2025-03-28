@@ -1,0 +1,123 @@
+=================================
+# Figure 6 - Transcriptional Characterization of Cell Fate Decisions
+#==========================================
+
+# Load required libraries
+library(Signac)
+library(Seurat)
+library(SeuratData)
+library(scater)
+library(SeuratWrappers)
+library(monocle3)
+library(Matrix)
+library(ggplot2)
+library(patchwork)
+library(GeneSwitches)
+library(SingleCellExperiment)
+library(dplyr)
+library(viridis)
+library(RColorBrewer)
+library(pheatmap)
+library(circlize)
+library(scCustomize)
+
+# Subset and preprocess data
+cvpfop_filt <- subset(cvpfop, idents = c("15", "14", "13", "17"), invert = TRUE)
+cvpfop_filt <- FindVariableFeatures(cvpfop_filt)
+cvpfop_filt <- RunPCA(cvpfop_filt)
+ElbowPlot(cvpfop_filt, ndims = 50)
+cvpfop_filt <- FindNeighbors(cvpfop_filt, reduction = "pca", dims = 1:25)
+cvpfop_filt <- FindClusters(cvpfop_filt, resolution = 0.5)
+cvpfop_filt <- RunUMAP(cvpfop_filt, dims = 1:28, min.dist = 0.4)
+cvpfop_filt <- subset(cvpfop_filt, idents = "7", invert = TRUE)
+
+# Convert to CellDataSet and perform pseudotime analysis
+cvpfop_filt.cds <- as.cell_data_set(cvpfop_filt)
+cvpfop_filt.cds <- estimate_size_factors(cvpfop_filt.cds)
+cvpfop_filt.cds <- cluster_cells(cvpfop_filt.cds, reduction_method = "UMAP")
+cvpfop_filt.cds <- learn_graph(cvpfop_filt.cds)
+cvpfop_filt.cds <- order_cells(cvpfop_filt.cds)
+
+# Transfer annotations
+cvpfop_filt$cell_types <- NA
+valid_cells <- rownames(cvpfop_filt@meta.data) %in% rownames(annocvpfop@meta.data)
+cvpfop_filt$cell_types[valid_cells] <- annocvpfop$cell_types[rownames(cvpfop_filt@meta.data)[valid_cells]]
+cvpfop_filt$cell_types[is.na(cvpfop_filt$cell_types)] <- "Unknown"
+cvpfop_filt <- subset(cvpfop_filt, idents = "Unknown", invert = TRUE)
+cvpfop_filt <- RenameIdents(cvpfop_filt, 
+                            "1" = "Basal progenitor",
+                            "2" = "non-taste Lingual EC#1",
+                            "3" = "Lgr5+ stem cell",
+                            "4" = "Cycling Basal",
+                            "5" = "Krt14+ Basal",
+                            "6" = "Ductal (Saliva)",
+                            "7" = "non-taste Lingual EC#2",
+                            "8" = "Taste (Type-I, III & IV)",
+                            "9" = "Taste (Type-II)")
+
+# Plot pseudotime and cell types
+plot_cells(cvpfop_filt.cds, color_cells_by = "cell_types", show_trajectory_graph = FALSE)
+plot_cells(cvpfop_filt.cds, color_cells_by = "pseudotime", show_trajectory_graph = TRUE)
+
+# Prepare for GeneSwitch analysis
+SeuratChat <- function(Seuratrds, clusters) {
+  Seuratrds <- subset(Seuratrds, seurat_clusters %in% clusters)
+  expdata <- as.matrix(Seuratrds@assays$RNA@data)
+  sce <- SingleCellExperiment(assays = list(expdata = expdata), reducedDims = SimpleList(UMAP = Seuratrds@reductions$umap@cell.embeddings))
+  colData(sce)$Pseudotime <- Seuratrds@meta.data$Pseudotime
+  return(sce)
+}
+
+# Subset trajectories for taste and saliva lineages
+l5t <- subset(cvpfop_filt, idents = c(4,11,12))
+l5vE <- subset(cvpfop_filt, idents = c(4,10,6,7))
+l5t.cds <- as.cell_data_set(l5t)
+l5vE.cds <- as.cell_data_set(l5vE)
+sce_l5t <- SeuratChat(cvpfop_filt, c(4,11,12))
+sce_l5vE <- SeuratChat(cvpfop_filt, c(4,10,6,7))
+
+# Binarize expression and run GeneSwitches
+sce_l5t <- binarize_exp(sce_l5t, fix_cutoff = TRUE, binarize_cutoff = bn_cutoff)
+sce_l5vE <- binarize_exp(sce_l5vE, fix_cutoff = TRUE, binarize_cutoff = bn_cutoff)
+sce_l5t <- find_switch_logistic_fastglm(sce_l5t)
+sce_l5vE <- find_switch_logistic_fastglm(sce_l5vE)
+
+# GeneSwitch filtering
+gs_genelists <- read.csv("Mouse_TFs_Surface.csv")
+sg_allgenes_l5t150 <- filter_switchgenes(sce_l5t, allgenes = TRUE, topnum = 150)
+sg_gtypes_l5t150 <- filter_switchgenes(sce_l5t, allgenes = FALSE, topnum = 150, genelists = gs_genelists, genetype = c("Surface proteins", "TFs"))
+sg_l5t <- rbind(sg_gtypes_l5t150, sg_allgenes_l5t150[setdiff(rownames(sg_allgenes_l5t150), rownames(sg_gtypes_l5t150)),])
+
+sg_allgenes_l5vE150 <- filter_switchgenes(sce_l5vE, allgenes = TRUE, topnum = 100)
+sg_gtypes_l5vE150 <- filter_switchgenes(sce_l5vE, allgenes = FALSE, topnum = 150, genelists = gs_genelists, genetype = c("Surface proteins", "TFs"))
+sg_l5vE <- rbind(sg_gtypes_l5vE150, sg_allgenes_l5vE150[setdiff(rownames(sg_allgenes_l5vE150), rownames(sg_gtypes_l5vE150)),])
+
+# Plot timelines
+ggplot_gene_switches <- plot_timeline_ggplot(sg_l5t, timedata = sce_l5t$Pseudotime, txtsize = 3)
+plot_timeline_ggplot(sg_l5vE, timedata = sce_l5vE$Pseudotime, txtsize = 3)
+
+# Save output for downstream analysis
+save(dataframe_for_heatmap_l5vE, file = "dataframe_for_heatmap_l5vE.Rda")
+
+
+
+
+
+#===========================
+# Figure 6g-h: Heatmap from pseudotime
+#===========================
+
+# Example dataframe_for_heatmap_l5vE pseudotime matrix already available
+# Process heatmap matrix
+heat_df <- dataframe_for_heatmap_l5vE[order(dataframe_for_heatmap_l5vE$Pseudotime), ]
+heat_expr <- t(heat_df[, -1])
+heat_smoothed <- apply(heat_expr, 1, function(x) smooth.spline(heat_df$Pseudotime, x, df = 4)$y)
+heat_scaled <- t(apply(t(heat_smoothed), 1, function(x) (x - mean(x)) / sd(x)))
+
+# Plot heatmap
+pheatmap(heat_scaled,
+         cluster_rows = FALSE,
+         cluster_cols = FALSE,
+         show_colnames = FALSE,
+         color = colorRampPalette(rev(brewer.pal(11, "Spectral")))(100),
+         fontsize_row = 18)
