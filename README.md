@@ -19,7 +19,7 @@ Processed bulk and single-cell RNA sequencing data are deposited to the GEO repo
 | **Figure 6** | Transcriptional characterization of cell fate decisions|
 | **Figure 7** | Foxe1-KO organoids project an ablation of differentiation queues|
 | **Supplementary Figures** | Marker gene expression (DotPlots), GO enrichment, and von Ebner gland analysis |
-| **Supplementary Figure 3** |Supplementary Fig. 3 | Characterization of the Lgr5 stem cell cluster |
+| **Supplementary Figure 3**  | Characterization of the Lgr5 stem cell cluster |
 | **Supplementary Figure 4** | CVP organoids harbor acinar- and ductal-like populations |
 |
 NOTE: scripts for easy featurplots showing relative expression are not projected in the code as they are simple plots
