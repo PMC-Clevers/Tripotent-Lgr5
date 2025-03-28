@@ -36,7 +36,7 @@ ElbowPlot( so.combined, ndims = 50)
 so.combined <- FindNeighbors(so.combined, reduction = "pca", dims = 1:25, nn.eps = 0.5) 
 so.combined <- FindClusters(so.combined, resolution = 0.5, n.start = 10) 
 so.combined <- RunUMAP(so.combined, dims = 1:25, min.dist = 0.5)
-DimPlot(so.combined, reduction = "umap", pt.size = 0.1, label = T, ncol = 3) + ggtitle(label = "UMAP")
+DimPlot(so.combined, reduction = "umap", pt.size = 0.1, label = T) + ggtitle(label = "UMAP") + NoAxes()
 
 #remove immune, endothelial clusters 
 so.combined <- subset(so.combined, idents = c("10", "12","13"), invert=T)
@@ -45,7 +45,10 @@ new.cluster.ids = c("Basal progenitor", "Basal progenitor","Lingual EC", "Lgr5+ 
 names(x = new.cluster.ids) <- levels(x = so.combined)
 anno.cvpfop1 <- RenameIdents(object = so.combined, new.cluster.ids)
 
-#genes utilized for clustering 
+###figure 1b 
+DimPlot(so.combined, reduction = "umap", pt.size = 0.1, label = T) + ggtitle(label = "UMAP") + NoAxes()
+
+#genes utilized for clustering FIGure 1c
 cluster_fig1<-c("Snap25","Car4","Entpd2", "Krt8", "Krt19", "Gnat3","Trpm5" , "Krt5", "Krt14", "Mki67", "Sprr1b", "Krt4", "Krt13", "Vim", "Shh","Lgr5", "Lgr6", "Acta2", "Muc19","Dcpp1", "Cldn2", "Sox9", "Sox2")
 ##function to get colours from umap based on amount of clusters
 ggplotColours <- function(n = 6, h = c(0, 360) + 15){
@@ -99,7 +102,7 @@ ggplot2::ggplot(data, ggplot2::aes(y = id, x = features.plot, size = pct.exp, fi
                                    fill=ggplot2::guide_colorbar(title.position = "top", label.position = "top")))
 
 
-Supplementary figure 1 
+###Supplementary figure 1e
 
 genes <- read.csv("20240930_intermediatemarkers.csv", header = FALSE, stringsAsFactors = FALSE)
 gene_list <- genes$V1  # Extract gene symbols
