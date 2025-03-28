@@ -1,0 +1,140 @@
+#==========================================
+# Figure 1 - Clustering & Marker Analysis
+#==========================================
+
+# Load required libraries
+library(Signac)
+library(Seurat)
+library(SeuratData)
+library(scater)
+library(SeuratWrappers)
+library(monocle3)
+library(monocle)
+library(Matrix)
+library(ggplot2)
+library(patchwork)
+library(GeneSwitches)
+library(SingleCellExperiment)
+library(dplyr)
+library(viridis)
+library(RColorBrewer)
+library(pheatmap)
+library(circlize)
+library(scCustomize)
+library(clusterProfiler)
+library(org.Mm.eg.db)
+
+#==========================================
+# Preprocessing
+#==========================================
+
+so_cvp <- CreateSeuratObject(counts = cvp, project = "CVP", min.cells = 3, min.features = 200)
+so_fop <- CreateSeuratObject(counts = fop, project = "FoP", min.cells = 3, min.features = 200)
+so.combined <- merge(so_fop, y = c(so_cvp), add.cell.ids = c("FoP", "CVP"), project = "Tastebud")
+
+# Mitochondrial filtering and normalization
+so.combined[["percent.mt"]] <- PercentageFeatureSet(so.combined, pattern = "^mt-")
+so.combined <- ScaleData(so.combined, vars.to.regress = "percent.mt")
+so.combined <- NormalizeData(so.combined, normalization.method = "LogNormalize", scale.factor = 10000)
+so.combined <- FindVariableFeatures(so.combined)
+so.combined <- RunPCA(so.combined, pcs.compute = 25)
+ElbowPlot(so.combined, ndims = 50)
+so.combined <- FindNeighbors(so.combined, dims = 1:25)
+so.combined <- FindClusters(so.combined, resolution = 0.5)
+so.combined <- RunUMAP(so.combined, dims = 1:25, min.dist = 0.5)
+
+# Remove unwanted clusters (immune, endothelial)
+so.combined <- subset(so.combined, idents = c("10", "12", "13"), invert = TRUE)
+
+# Rename clusters
+new.cluster.ids <- c("Basal progenitor", "Basal progenitor", "Lingual EC", "Lgr5+ stem cell",
+                     "cycling Basal", "Krt14+ Basal", "cycling Basal", "Ductal (saliva)",
+                     "Intermediate progenitor", "Taste (Type-I, III & IV)", "Taste (Type-II)", "Acinar (saliva)")
+names(new.cluster.ids) <- levels(so.combined)
+so.combined <- RenameIdents(so.combined, new.cluster.ids)
+
+#==========================================
+# Figure 1b - UMAP Plot
+#==========================================
+DimPlot(so.combined, reduction = "umap", pt.size = 0.1, label = TRUE) + ggtitle("UMAP") + NoAxes()
+
+#==========================================
+# Figure 1c - DotPlot of clustering genes
+#==========================================
+cluster_fig1 <- c("Snap25", "Car4", "Entpd2", "Krt8", "Krt19", "Gnat3", "Trpm5", "Krt5", "Krt14", "Mki67",
+                  "Sprr1b", "Krt4", "Krt13", "Vim", "Shh", "Lgr5", "Lgr6", "Acta2", "Muc19", "Dcpp1",
+                  "Cldn2", "Sox9", "Sox2")
+
+ggplotColours <- function(n = 6, h = c(0, 360) + 15) {
+  if ((diff(h) %% 360) < 1) h[2] <- h[2] - 360/n
+  hcl(h = (seq(h[1], h[2], length = n)), c = 100, l = 65)
+}
+clust.cols <- ggplotColours(n = 10)
+
+p <- DotPlot_scCustom(so.combined, features = cluster_fig1)
+data <- p$data
+
+ggplot(data, aes(y = id, x = features.plot, size = pct.exp, fill = avg.exp.scaled)) +
+  geom_point(shape = 21) +
+  theme_bw() +
+  scale_size_area(max_size = 10) +
+  scale_fill_gradient2(low = "blue3", high = "red3", mid = "white", limits = c(-2.5, 2.5)) +
+  labs(fill = "Relative expression", size = "Percent expressed") +
+  xlab("Cluster") + ylab("Gene") +
+  theme(axis.text.y = element_text(size = 12, color = clust.cols),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+        axis.title = element_text(size = 0),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        legend.position = "bottom",
+        panel.background = element_rect(colour = "black", size = 1)) +
+  guides(size = guide_legend(ncol = 2, title.position = "top"),
+         fill = guide_colorbar(title.position = "top", label.position = "top"))
+
+#==========================================
+# Supplementary Figure S2 - Von Ebner Markers
+#==========================================
+vonebneranno.markers <- c("Dcpp1", "Dcpp3", "Aqp5", "Bhlha15", "Krt19", "Krt8", "Krt7", "Cldn10", "Cldn2",
+                          "Ltf", "Dmbt1", "Acta2", "Myl9", "Muc19", "Muc16", "Muc5b", "Amy1", "Mki67",
+                          "Krt14", "Krt5", "Kit", "Psca", "Sox9", "Epcam")
+p <- DotPlot_scCustom(vonEbner, features = vonebneranno.markers)
+data <- p$data
+
+ggplot(data, aes(y = id, x = features.plot, size = pct.exp, fill = avg.exp.scaled)) +
+  geom_point(shape = 21) +
+  theme_bw() +
+  scale_size_area(max_size = 10) +
+  scale_fill_gradient2(low = "blue3", high = "red3", mid = "white", limits = c(-2.5, 2.5)) +
+  labs(fill = "Relative expression", size = "Percent expressed") +
+  xlab("Cluster") + ylab("Gene") +
+  theme(axis.text.y = element_text(size = 12, color = clust.cols),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+        axis.title = element_text(size = 0),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        legend.position = "bottom",
+        panel.background = element_rect(colour = "black", size = 1)) +
+  guides(size = guide_legend(ncol = 2, title.position = "top"),
+         fill = guide_colorbar(title.position = "top", label.position = "top"))
+
+#==========================================
+# Supplementary Figure 1e - GO Enrichment
+#==========================================
+genes <- read.csv("20240930_intermediatemarkers.csv", header = FALSE, stringsAsFactors = FALSE)
+gene_list <- genes$V1
+entrez_ids <- mapIds(org.Mm.eg.db, keys = gene_list, keytype = "SYMBOL", column = "ENTREZID")
+entrez_ids <- na.omit(entrez_ids)
+
+ego <- enrichGO(gene = entrez_ids, 
+                OrgDb = org.Mm.eg.db, 
+                keyType = "ENTREZID", 
+                ont = "BP", 
+                pAdjustMethod = "fdr", 
+                pvalueCutoff = 0.05, 
+                qvalueCutoff = 0.05, 
+                readable = TRUE)
+
+# GO Visualizations
+barplot(ego, showCategory = 15, title = "Top GO Terms in Biological Process")
+dotplot(ego, showCategory = 15, title = "GO Biological Process Enrichment")
+emapplot(ego, showCategory = 15)
