@@ -28,10 +28,10 @@ NOTE: scripts for easy featurplots showing relative expression are not projected
 ## 📦 Datasets Used
 
 - `cvp`, `fop`: Raw count matrices from CVP and FoP
-- `annocvpfop`: Annotated merged Seurat object for taste tissues
+- `annocvpfop`: Annotated merged Seurat object for the posterior tongue
 - `postnatalSMG`: External dataset for acinar subtype annotation
 - `vonEbner`: Subset of annocvpfop corresponding to von Ebner gland
-- `taste`: Subset of annocvpfop corresponding to von Ebner gland
+- `taste`: Subset of annocvpfop corresponding to taste
 - Clone datasets: `Clone1`, `Clone3`, `Clone7`
 
 ---
